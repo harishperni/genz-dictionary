@@ -1,0 +1,1104 @@
+[
+  {
+    "term": "lowkey",
+    "meaning": "Kind of; subtly; secretly.",
+    "example": "Lowkey want to skip and nap.",
+    "emojis": ["🤫","🌙"],
+    "tags": ["mood"]
+  },
+  {
+    "term": "situationship",
+    "meaning": "More than friends, less than a defined relationship.",
+    "example": "We hang out a lot, but it’s a situationship.",
+    "emojis": ["💞","🤷"],
+    "tags": ["dating"]
+  },
+  {
+    "term": "rizz",
+    "meaning": "Charisma or flirting skill.",
+    "example": "He’s got mad rizz at the party.",
+    "emojis": ["😎","✨"],
+    "tags": ["social","dating"]
+  },
+  {
+    "term": "cap",
+    "meaning": "A lie or exaggeration.",
+    "example": "You met Beyoncé? Cap.",
+    "emojis": ["🧢","🚫"],
+    "tags": ["truth","slang"]
+  },
+  {
+    "term": "no cap",
+    "meaning": "For real; not lying.",
+    "example": "That burger was amazing, no cap.",
+    "emojis": ["✅","🧢"],
+    "tags": ["truth","emphasis"]
+  },
+  {
+    "term": "bet",
+    "meaning": "Okay; confirmed; challenge accepted.",
+    "example": "You’ll be there at 7? Bet.",
+    "emojis": ["👌","📝"],
+    "tags": ["agreement"]
+  },
+  {
+    "term": "delulu",
+    "meaning": "Playfully delusional or unrealistic.",
+    "example": "I’m delulu thinking I’ll ace it without studying.",
+    "emojis": ["🤪","💭"],
+    "tags": ["humor","school"]
+  },
+  {
+    "term": "gyatt",
+    "meaning": "Exclamation of surprise or admiration (internet slang).",
+    "example": "GYATT, that clip was insane!",
+    "emojis": ["😳","🔥"],
+    "tags": ["reaction","internet"]
+  },
+  {
+    "term": "npc",
+    "meaning": "Someone acting robotic or unoriginal.",
+    "example": "The cashier repeated the same line—NPC vibes.",
+    "emojis": ["🤖","🎮"],
+    "tags": ["gaming","humor"]
+  },
+  {
+    "term": "main character",
+    "meaning": "Acting like the star of your own story.",
+    "example": "Walking to class with headphones, main character energy.",
+    "emojis": ["🎬","🌟"],
+    "tags": ["vibes","aesthetic"]
+  },
+  {
+    "term": "it’s giving",
+    "meaning": "It resembles or evokes a certain vibe.",
+    "example": "That jacket? It’s giving 90s movie star.",
+    "emojis": ["🎁","✨"],
+    "tags": ["fashion","vibes"]
+  },
+  {
+    "term": "vibe",
+    "meaning": "Overall mood or atmosphere.",
+    "example": "This café has such a chill vibe.",
+    "emojis": ["🌈","🎧"],
+    "tags": ["mood","aesthetic"]
+  },
+  {
+    "term": "vibe check",
+    "meaning": "Quick read of someone’s energy.",
+    "example": "He passed the vibe check.",
+    "emojis": ["📝","🔋"],
+    "tags": ["social","mood"]
+  },
+  {
+    "term": "slay",
+    "meaning": "Do something exceptionally well.",
+    "example": "You slayed that presentation.",
+    "emojis": ["💅","🏆"],
+    "tags": ["compliment","success"]
+  },
+  {
+    "term": "ate",
+    "meaning": "Performed amazingly; nailed it.",
+    "example": "She ate that choreography.",
+    "emojis": ["🍽️","🔥"],
+    "tags": ["compliment","performance"]
+  },
+  {
+    "term": "drip",
+    "meaning": "Great outfit or style.",
+    "example": "Your fit has serious drip.",
+    "emojis": ["💧","👟"],
+    "tags": ["fashion"]
+  },
+  {
+    "term": "fit",
+    "meaning": "Outfit.",
+    "example": "That fit is clean.",
+    "emojis": ["🧥","🕶️"],
+    "tags": ["fashion"]
+  },
+  {
+    "term": "stan",
+    "meaning": "To strongly support or admire.",
+    "example": "I stan that artist.",
+    "emojis": ["🙌","🌟"],
+    "tags": ["fan","support"]
+  },
+  {
+    "term": "tea",
+    "meaning": "Gossip or interesting news.",
+    "example": "Spill the tea about last night.",
+    "emojis": ["🫖","👀"],
+    "tags": ["gossip"]
+  },
+  {
+    "term": "salty",
+    "meaning": "Bitter or annoyed.",
+    "example": "He’s salty about the loss.",
+    "emojis": ["🧂","🙄"],
+    "tags": ["emotion","reaction"]
+  },
+  {
+    "term": "boujee",
+    "meaning": "Luxurious or high-class in taste.",
+    "example": "She’s boujee with her coffee order.",
+    "emojis": ["💎","☕"],
+    "tags": ["lifestyle"]
+  },
+  {
+    "term": "savage",
+    "meaning": "Bold and unapologetic.",
+    "example": "That comeback was savage.",
+    "emojis": ["🗣️","🔥"],
+    "tags": ["confidence"]
+  },
+  {
+    "term": "shook",
+    "meaning": "Surprised or shocked.",
+    "example": "I was shook by the ending.",
+    "emojis": ["😳","⚡"],
+    "tags": ["reaction"]
+  },
+  {
+    "term": "fire",
+    "meaning": "Amazing or excellent.",
+    "example": "That track is fire.",
+    "emojis": ["🔥","🎵"],
+    "tags": ["compliment","music"]
+  },
+  {
+    "term": "slaps",
+    "meaning": "Sounds great, usually music.",
+    "example": "This album slaps.",
+    "emojis": ["🎶","👏"],
+    "tags": ["music","compliment"]
+  },
+  {
+    "term": "lit",
+    "meaning": "Exciting or excellent.",
+    "example": "The party was lit.",
+    "emojis": ["✨","🎉"],
+    "tags": ["party","compliment"]
+  },
+  {
+    "term": "ghost",
+    "meaning": "To abruptly stop replying.",
+    "example": "We chatted daily then she ghosted me.",
+    "emojis": ["👻","📵"],
+    "tags": ["dating","communication"]
+  },
+  {
+    "term": "yeet",
+    "meaning": "To throw with force; excited exclamation.",
+    "example": "He yeeted the ball across the yard.",
+    "emojis": ["💨","🏈"],
+    "tags": ["action","slang"]
+  },
+  {
+    "term": "finna",
+    "meaning": "Fixing to; going to.",
+    "example": "I’m finna grab lunch.",
+    "emojis": ["🕒","🍔"],
+    "tags": ["plans"]
+  },
+  {
+    "term": "highkey",
+    "meaning": "Obviously; openly.",
+    "example": "I highkey love this show.",
+    "emojis": ["🔊","❤️"],
+    "tags": ["opinion"]
+  },
+  {
+    "term": "bruh",
+    "meaning": "Expression of disbelief or frustration.",
+    "example": "Bruh, really?",
+    "emojis": ["😐","🤦"],
+    "tags": ["reaction"]
+  },
+  {
+    "term": "GOAT",
+    "meaning": "Greatest of all time.",
+    "example": "Serena is the GOAT.",
+    "emojis": ["🐐","🏆"],
+    "tags": ["praise","sports"]
+  },
+  {
+    "term": "based",
+    "meaning": "Confidently true to yourself.",
+    "example": "That’s a based take.",
+    "emojis": ["🧱","✅"],
+    "tags": ["opinion","compliment"]
+  },
+  {
+    "term": "ratio",
+    "meaning": "When replies outnumber likes (seen as a dunk).",
+    "example": "L + ratio.",
+    "emojis": ["📉","💬"],
+    "tags": ["social media"]
+  },
+  {
+    "term": "mid",
+    "meaning": "Mediocre; not great.",
+    "example": "The sequel was mid.",
+    "emojis": ["😶","↔️"],
+    "tags": ["opinion"]
+  },
+  {
+    "term": "glow up",
+    "meaning": "Big improvement in looks or style.",
+    "example": "She had a summer glow up.",
+    "emojis": ["💡","🌸"],
+    "tags": ["transformation"]
+  },
+  {
+    "term": "bread",
+    "meaning": "Money; income.",
+    "example": "He’s stacking bread.",
+    "emojis": ["🍞","💸"],
+    "tags": ["money"]
+  },
+  {
+    "term": "gucci",
+    "meaning": "Good; going well.",
+    "example": "All gucci on my end.",
+    "emojis": ["🟢","👌"],
+    "tags": ["approval"]
+  },
+  {
+    "term": "thirsty",
+    "meaning": "Desperate for attention.",
+    "example": "The captions are thirsty.",
+    "emojis": ["🥤","👀"],
+    "tags": ["attention"]
+  },
+  {
+    "term": "squad",
+    "meaning": "Close friend group.",
+    "example": "Rolling with the squad.",
+    "emojis": ["👥","🤝"],
+    "tags": ["friends"]
+  },
+  {
+    "term": "mood",
+    "meaning": "Relatable feeling.",
+    "example": "Rainy-day nap is a mood.",
+    "emojis": ["😴","🌧️"],
+    "tags": ["feelings"]
+  },
+  {
+    "term": "drag",
+    "meaning": "To harshly criticize.",
+    "example": "They dragged his take online.",
+    "emojis": ["🗯️","🧯"],
+    "tags": ["criticism"]
+  },
+  {
+    "term": "extra",
+    "meaning": "Over the top; dramatic.",
+    "example": "The outfit is extra but iconic.",
+    "emojis": ["🎭","✨"],
+    "tags": ["drama"]
+  },
+  {
+    "term": "basic",
+    "meaning": "Mainstream or predictable.",
+    "example": "Pumpkin spice season is basic.",
+    "emojis": ["☕","🍂"],
+    "tags": ["trend"]
+  },
+  {
+    "term": "ship",
+    "meaning": "To support a romantic pairing.",
+    "example": "I ship them together.",
+    "emojis": ["🚢","💘"],
+    "tags": ["fan","dating"]
+  },
+  {
+    "term": "snack",
+    "meaning": "Very attractive person.",
+    "example": "He’s looking like a snack.",
+    "emojis": ["🍫","😍"],
+    "tags": ["compliment","dating"]
+  },
+  {
+    "term": "shade",
+    "meaning": "Subtle disrespect.",
+    "example": "She threw shade in that post.",
+    "emojis": ["🌳","😒"],
+    "tags": ["insult"]
+  },
+  {
+    "term": "receipts",
+    "meaning": "Proof or evidence.",
+    "example": "Drop the receipts.",
+    "emojis": ["🧾","📎"],
+    "tags": ["proof"]
+  },
+  {
+    "term": "poppin",
+    "meaning": "Exciting; lively.",
+    "example": "The event is poppin tonight.",
+    "emojis": ["🎉","📣"],
+    "tags": ["party"]
+  },
+  {
+    "term": "thicc",
+    "meaning": "Curvy in an attractive way.",
+    "example": "She’s looking thicc in that fit.",
+    "emojis": ["🍑","💃"],
+    "tags": ["compliment"]
+  },
+  {
+    "term": "hit different",
+    "meaning": "Feels uniquely impactful.",
+    "example": "This song hits different at night.",
+    "emojis": ["🌙","🎧"],
+    "tags": ["feelings","music"]
+  },
+  {
+    "term": "touch grass",
+    "meaning": "Go outside; log off.",
+    "example": "Close the app and touch grass.",
+    "emojis": ["🌿","🚶"],
+    "tags": ["advice","internet"]
+  },
+  {
+    "term": "cheugy",
+    "meaning": "Outdated or trying too hard.",
+    "example": "That meme format is cheugy now.",
+    "emojis": ["🗓️","😬"],
+    "tags": ["trend"]
+  },
+  {
+    "term": "big yikes",
+    "meaning": "Strong cringe or disapproval.",
+    "example": "That comment was a big yikes.",
+    "emojis": ["😬","⚠️"],
+    "tags": ["reaction"]
+  },
+  {
+    "term": "pluh",
+    "meaning": "Random sound to end a convo or bit.",
+    "example": "And then… pluh.",
+    "emojis": ["🗯️","🌀"],
+    "tags": ["internet"]
+  },
+  {
+    "term": "dead",
+    "meaning": "Extremely amused; laughing a lot.",
+    "example": "That meme had me dead.",
+    "emojis": ["💀","🤣"],
+    "tags": ["funny","reaction"]
+  },
+  {
+    "term": "bussin",
+    "meaning": "Extremely good (often food).",
+    "example": "These tacos are bussin.",
+    "emojis": ["🌮","🔥"],
+    "tags": ["food","compliment"]
+  },
+  {
+    "term": "clout",
+    "meaning": "Influence or fame online.",
+    "example": "He’s doing it for clout.",
+    "emojis": ["📈","📱"],
+    "tags": ["social media"]
+  },
+  {
+    "term": "cancelled",
+    "meaning": "Rejected by the community for bad behavior.",
+    "example": "That creator got cancelled.",
+    "emojis": ["🚫","📉"],
+    "tags": ["pop culture"]
+  },
+  {
+    "term": "swole",
+    "meaning": "Very muscular.",
+    "example": "He’s been lifting—dude is swole.",
+    "emojis": ["💪","🏋️"],
+    "tags": ["fitness"]
+  },
+  {
+    "term": "dragged",
+    "meaning": "Severely criticized.",
+    "example": "He got dragged for that tweet.",
+    "emojis": ["🗯️","🔥"],
+    "tags": ["criticism"]
+  },
+  {
+    "term": "main quest",
+    "meaning": "Primary goal or priority.",
+    "example": "Focus on the main quest: finals.",
+    "emojis": ["🎯","📚"],
+    "tags": ["gaming","goals"]
+  },
+  {
+    "term": "side quest",
+    "meaning": "Fun but nonessential activity.",
+    "example": "Coffee run is a side quest.",
+    "emojis": ["☕","🗺️"],
+    "tags": ["gaming","fun"]
+  },
+  {
+    "term": "gg",
+    "meaning": "Good game; well played.",
+    "example": "We lost, but gg.",
+    "emojis": ["🤝","🎮"],
+    "tags": ["gaming"]
+  },
+  {
+    "term": "nerf",
+    "meaning": "Weaken a character/feature in a game.",
+    "example": "They nerfed my main.",
+    "emojis": ["🔧","🪓"],
+    "tags": ["gaming","update"]
+  },
+  {
+    "term": "buff",
+    "meaning": "Strengthen a character/feature in a game.",
+    "example": "Healer got a huge buff.",
+    "emojis": ["🛡️","⚔️"],
+    "tags": ["gaming","update"]
+  },
+  {
+    "term": "irl",
+    "meaning": "In real life.",
+    "example": "We finally met irl.",
+    "emojis": ["🌍","👋"],
+    "tags": ["internet"]
+  },
+  {
+    "term": "fr",
+    "meaning": "For real; seriously.",
+    "example": "That was wild, fr.",
+    "emojis": ["🫡","✅"],
+    "tags": ["truth","emphasis"]
+  },
+  {
+    "term": "ong",
+    "meaning": "On God; I swear.",
+    "example": "Best show ever, ong.",
+    "emojis": ["🤞","✨"],
+    "tags": ["truth","slang"]
+  },
+  {
+    "term": "idc",
+    "meaning": "I don’t care.",
+    "example": "Idc what they say.",
+    "emojis": ["👐","😶"],
+    "tags": ["attitude"]
+  },
+  {
+    "term": "idk",
+    "meaning": "I don’t know.",
+    "example": "Idk the answer.",
+    "emojis": ["🤷","❓"],
+    "tags": ["uncertainty"]
+  },
+  {
+    "term": "lmk",
+    "meaning": "Let me know.",
+    "example": "Lmk if you’re free.",
+    "emojis": ["📩","⏰"],
+    "tags": ["communication"]
+  },
+  {
+    "term": "wyd",
+    "meaning": "What are you doing?",
+    "example": "Hey, wyd?",
+    "emojis": ["👀","💬"],
+    "tags": ["conversation"]
+  },
+  {
+    "term": "wya",
+    "meaning": "Where you at?",
+    "example": "I’m outside—wya?",
+    "emojis": ["📍","🚗"],
+    "tags": ["conversation"]
+  },
+  {
+    "term": "btw",
+    "meaning": "By the way.",
+    "example": "Btw, I emailed you.",
+    "emojis": ["📎","💡"],
+    "tags": ["communication"]
+  },
+  {
+    "term": "smh",
+    "meaning": "Shaking my head.",
+    "example": "You forgot again, smh.",
+    "emojis": ["🤦","🙈"],
+    "tags": ["reaction"]
+  },
+  {
+      "term": "lol",
+      "meaning": "Laughing out loud.",
+      "example": "lol that was funny.",
+      "emojis": ["😂","🎭"],
+      "tags": ["reaction","funny"]
+    },
+    {
+      "term": "lmao",
+      "meaning": "Laughing my ass off.",
+      "example": "That clip had me lmao.",
+      "emojis": ["🤣","🔥"],
+      "tags": ["reaction","funny"]
+    },
+    {
+      "term": "omg",
+      "meaning": "Oh my God.",
+      "example": "Omg that’s adorable.",
+      "emojis": ["😲","💖"],
+      "tags": ["reaction"]
+    },
+    {
+      "term": "omw",
+      "meaning": "On my way.",
+      "example": "Leaving now, omw.",
+      "emojis": ["🚗","📍"],
+      "tags": ["communication"]
+    },
+    {
+      "term": "tbh",
+      "meaning": "To be honest.",
+      "example": "Tbh, I wasn’t a fan.",
+      "emojis": ["🫢","🤷"],
+      "tags": ["honesty"]
+    },
+    {
+      "term": "imo",
+      "meaning": "In my opinion.",
+      "example": "Imo, that’s the best movie.",
+      "emojis": ["💭","🎬"],
+      "tags": ["opinion"]
+    },
+    {
+      "term": "idgaf",
+      "meaning": "I don’t give a f***.",
+      "example": "Idgaf about the drama.",
+      "emojis": ["😎","🚫"],
+      "tags": ["attitude"]
+    },
+    {
+      "term": "asap",
+      "meaning": "As soon as possible.",
+      "example": "Send it asap.",
+      "emojis": ["⚡","📩"],
+      "tags": ["urgency"]
+    },
+    {
+      "term": "fomo",
+      "meaning": "Fear of missing out.",
+      "example": "Skipped the party but had fomo.",
+      "emojis": ["😬","🎉"],
+      "tags": ["emotion"]
+    },
+    {
+      "term": "jomo",
+      "meaning": "Joy of missing out.",
+      "example": "Stayed in and read—pure jomo.",
+      "emojis": ["📚","😌"],
+      "tags": ["emotion"]
+    },
+    {
+      "term": "irl",
+      "meaning": "In real life.",
+      "example": "Finally met irl.",
+      "emojis": ["🌍","👋"],
+      "tags": ["real life"]
+    },
+    {
+      "term": "bffr",
+      "meaning": "Be for real.",
+      "example": "Bffr, you actually did that?",
+      "emojis": ["😐","🤨"],
+      "tags": ["slang"]
+    },
+    {
+      "term": "iykyk",
+      "meaning": "If you know, you know.",
+      "example": "That inside joke… iykyk.",
+      "emojis": ["😉","🔑"],
+      "tags": ["inside joke"]
+    },
+    {
+      "term": "tldr",
+      "meaning": "Too long; didn’t read.",
+      "example": "Tldr: it didn’t work.",
+      "emojis": ["📄","✂️"],
+      "tags": ["summary"]
+    },
+    {
+      "term": "ngl",
+      "meaning": "Not gonna lie.",
+      "example": "Ngl, that was hilarious.",
+      "emojis": ["🫢","😂"],
+      "tags": ["honesty"]
+    },
+    {
+      "term": "prolly",
+      "meaning": "Probably.",
+      "example": "I’ll prolly skip.",
+      "emojis": ["🤔","📅"],
+      "tags": ["casual"]
+    },
+    {
+      "term": "sus",
+      "meaning": "Suspicious or shady.",
+      "example": "That deal sounds sus.",
+      "emojis": ["🕵️","🤨"],
+      "tags": ["slang","suspicion"]
+    },
+    {
+      "term": "yolo",
+      "meaning": "You only live once.",
+      "example": "Booked the trip—yolo.",
+      "emojis": ["✈️","🎯"],
+      "tags": ["motto"]
+    },
+    {
+      "term": "noob",
+      "meaning": "Beginner, especially in gaming.",
+      "example": "He’s still a noob at this game.",
+      "emojis": ["🎮","🐣"],
+      "tags": ["gaming"]
+    },
+    {
+      "term": "glhf",
+      "meaning": "Good luck, have fun.",
+      "example": "Match starting—glhf.",
+      "emojis": ["🍀","🎯"],
+      "tags": ["gaming"]
+    },
+    {
+      "term": "wp",
+      "meaning": "Well played.",
+      "example": "You beat me fair—wp.",
+      "emojis": ["👏","🎮"],
+      "tags": ["gaming"]
+    },
+    {
+      "term": "pog",
+      "meaning": "Excitement or hype (gaming).",
+      "example": "That win was pog.",
+      "emojis": ["🎉","🔥"],
+      "tags": ["gaming","reaction"]
+    },
+    {
+      "term": "clutch",
+      "meaning": "Pulled off success at the last moment.",
+      "example": "That save was clutch.",
+      "emojis": ["👐","🏆"],
+      "tags": ["gaming","achievement"]
+    },
+    {
+      "term": "rekt",
+      "meaning": "Destroyed or badly defeated.",
+      "example": "Got rekt in that match.",
+      "emojis": ["💥","🎮"],
+      "tags": ["gaming"]
+    },
+    {
+      "term": "op",
+      "meaning": "Overpowered.",
+      "example": "That weapon is op.",
+      "emojis": ["⚡","💣"],
+      "tags": ["gaming"]
+    },
+    {
+      "term": "afk",
+      "meaning": "Away from keyboard.",
+      "example": "BRB, afk for a sec.",
+      "emojis": ["⌨️","🚶"],
+      "tags": ["gaming","status"]
+    },
+    {
+      "term": "brb",
+      "meaning": "Be right back.",
+      "example": "Need water, brb.",
+      "emojis": ["💧","👋"],
+      "tags": ["status"]
+    },
+    {
+      "term": "gg ez",
+      "meaning": "Good game, easy win.",
+      "example": "Won in 5 minutes—gg ez.",
+      "emojis": ["🏆","😏"],
+      "tags": ["gaming","brag"]
+    },
+    {
+      "term": "lag",
+      "meaning": "Delay in gaming or online activity.",
+      "example": "Can’t play, too much lag.",
+      "emojis": ["🐌","📶"],
+      "tags": ["gaming","tech"]
+    },
+    {
+      "term": "mvp",
+      "meaning": "Most valuable player.",
+      "example": "You were the mvp this round.",
+      "emojis": ["🏅","🌟"],
+      "tags": ["sports","gaming"]
+    },
+    {
+      "term": "npc energy",
+      "meaning": "Acting unoriginal or background-like.",
+      "example": "He’s giving npc energy today.",
+      "emojis": ["🤖","🛠️"],
+      "tags": ["slang"]
+    },
+    {
+      "term": "grind",
+      "meaning": "Working hard, especially in gaming or hustle.",
+      "example": "On the grind for level 50.",
+      "emojis": ["⚒️","🎯"],
+      "tags": ["work","gaming"]
+    },
+    {
+      "term": "flex",
+      "meaning": "Show off.",
+      "example": "He flexed his new shoes.",
+      "emojis": ["💪","👟"],
+      "tags": ["brag","style"]
+    },
+    {
+      "term": "boom",
+      "meaning": "Exclamation for something explosive or exciting.",
+      "example": "And boom—victory!",
+      "emojis": ["💥","🎆"],
+      "tags": ["reaction"]
+    },
+    {
+      "term": "fam",
+      "meaning": "Close friends or family.",
+      "example": "What’s up, fam?",
+      "emojis": ["👨‍👩‍👧","🤝"],
+      "tags": ["friends"]
+    },
+    {
+      "term": "sis",
+      "meaning": "Affectionate term for female friend.",
+      "example": "You got this, sis.",
+      "emojis": ["🙋‍♀️","💖"],
+      "tags": ["friends"]
+    },
+    {
+      "term": "bro",
+      "meaning": "Casual term for male friend.",
+      "example": "Let’s hang out, bro.",
+      "emojis": ["🙋‍♂️","🤜🤛"],
+      "tags": ["friends"]
+    },
+    {
+      "term": "homie",
+      "meaning": "Close friend.",
+      "example": "That’s my homie from school.",
+      "emojis": ["🤝","🏠"],
+      "tags": ["friends"]
+    },
+    {
+      "term": "squad goals",
+      "meaning": "Ideal friend group dynamic.",
+      "example": "This pic is squad goals.",
+      "emojis": ["📸","🌟"],
+      "tags": ["friends"]
+    },
+    {
+      "term": "main",
+      "meaning": "Primary character in a game.",
+      "example": "I main the healer.",
+      "emojis": ["🛡️","🎮"],
+      "tags": ["gaming"]
+    },
+    {
+      "term": "touch grass",
+      "meaning": "Go outside and chill; log off for a bit.",
+      "example": "You’re arguing over cereal again—go touch grass.",
+      "emojis": ["🌱","🚶"],
+      "tags": ["wellness","internet"]
+    },
+    {
+      "term": "mid",
+      "meaning": "Mediocre; not bad, not great.",
+      "example": "The sequel was kinda mid tbh.",
+      "emojis": ["😐","↔️"],
+      "tags": ["rating"]
+    },
+    {
+      "term": "hard launch",
+      "meaning": "Publicly revealing a relationship in a bold way.",
+      "example": "Posting couple pics is a hard launch fr.",
+      "emojis": ["💥","💑"],
+      "tags": ["dating","social"]
+    },
+    {
+      "term": "soft launch",
+      "meaning": "Subtle hints of a relationship without fully revealing.",
+      "example": "Hand pics at brunch? That’s a soft launch.",
+      "emojis": ["🌫️","🤫"],
+      "tags": ["dating","social"]
+    },
+    {
+      "term": "no cap",
+      "meaning": "No lie; for real.",
+      "example": "That concert was fire, no cap.",
+      "emojis": ["🧢","✨"],
+      "tags": ["emphasis"]
+    },
+    {
+      "term": "cap",
+      "meaning": "Lie or exaggeration.",
+      "example": "You ran 10 miles? That’s cap.",
+      "emojis": ["🧢","🙄"],
+      "tags": ["callout"]
+    },
+    {
+      "term": "pressed",
+      "meaning": "Annoyed or upset over something small.",
+      "example": "Why you so pressed about a meme?",
+      "emojis": ["😤","🧯"],
+      "tags": ["mood"]
+    },
+    {
+      "term": "it’s giving",
+      "meaning": "It resembles/has the vibe of something.",
+      "example": "This outfit? It’s giving main character.",
+      "emojis": ["✨","🎬"],
+      "tags": ["fashion","vibes"]
+    },
+    {
+      "term": "main character energy",
+      "meaning": "Confident center-of-attention vibe.",
+      "example": "New haircut’s giving main character energy.",
+      "emojis": ["🌟","🎥"],
+      "tags": ["vibes","compliment"]
+    },
+    {
+      "term": "slaps",
+      "meaning": "Sounds great; hits hard (usually music).",
+      "example": "This track slaps on good speakers.",
+      "emojis": ["🎶","👏"],
+      "tags": ["music","rating"]
+    },
+    {
+      "term": "mog",
+      "meaning": "Totally outclass; dominate.",
+      "example": "They mogged the other team last night.",
+      "emojis": ["👑","💪"],
+      "tags": ["competition"]
+    },
+    {
+      "term": "ratio",
+      "meaning": "Replies or likes outweigh the original post; social L.",
+      "example": "Bro got ratioed in 10 minutes.",
+      "emojis": ["🧮","📉"],
+      "tags": ["social","internet"]
+    },
+    {
+      "term": "sus",
+      "meaning": "Suspicious; sketchy.",
+      "example": "That link looks sus—don’t click.",
+      "emojis": ["🕵️","⚠️"],
+      "tags": ["safety"]
+    },
+    {
+      "term": "ate",
+      "meaning": "Performed amazingly; did great.",
+      "example": "She ate that performance up!",
+      "emojis": ["🍽️","🔥"],
+      "tags": ["compliment"]
+    },
+    {
+      "term": "serving",
+      "meaning": "Delivering a strong look or vibe.",
+      "example": "You’re serving with that jacket.",
+      "emojis": ["🍽️","👗"],
+      "tags": ["fashion"]
+    },
+    {
+      "term": "low effort",
+      "meaning": "Done without much care or polish.",
+      "example": "That vid was funny but low effort.",
+      "emojis": ["🛋️","🧃"],
+      "tags": ["rating"]
+    },
+    {
+      "term": "rent free",
+      "meaning": "Something you can’t stop thinking about.",
+      "example": "That chorus lives rent free in my head.",
+      "emojis": ["🧠","🏠"],
+      "tags": ["feelings","music"]
+    },
+    {
+      "term": "vibe check",
+      "meaning": "Assessing the mood/energy.",
+      "example": "Vibe check: we still down for the movie?",
+      "emojis": ["📶","🧭"],
+      "tags": ["vibes","check"]
+    },
+    {
+      "term": "hits different",
+      "meaning": "Feels unusually good or impactful.",
+      "example": "Late night walks hit different.",
+      "emojis": ["🌃","💫"],
+      "tags": ["feelings"]
+    },
+    {
+      "term": "built different",
+      "meaning": "Exceptional or unusually capable.",
+      "example": "Dropping 40 points? He’s built different.",
+      "emojis": ["🏗️","💪"],
+      "tags": ["compliment"]
+    },
+    {
+      "term": "gym bro",
+      "meaning": "Fitness-obsessed guy stereotype.",
+      "example": "Protein talk with the gym bros again.",
+      "emojis": ["🏋️","🥤"],
+      "tags": ["fitness"]
+    },
+    {
+      "term": "NPC",
+      "meaning": "Someone acting unoriginal/robotic.",
+      "example": "He gave NPC answers all night.",
+      "emojis": ["🤖","🎮"],
+      "tags": ["insult","joke"]
+    },
+    {
+      "term": "vouched",
+      "meaning": "Approved; someone verifies it’s good.",
+      "example": "That streamer’s vouched—safe to watch.",
+      "emojis": ["✅","🤝"],
+      "tags": ["trust"]
+    },
+    {
+      "term": "POV",
+      "meaning": "Point of view; trend format.",
+      "example": "POV: you finally touch grass.",
+      "emojis": ["📹","👀"],
+      "tags": ["format","video"]
+    },
+    {
+      "term": "based",
+      "meaning": "Unapologetically true to oneself; agreeable.",
+      "example": "Skipping drama? Based move.",
+      "emojis": ["🧊","👍"],
+      "tags": ["approval"]
+    },
+    {
+      "term": "cringe",
+      "meaning": "Embarrassing; awkward.",
+      "example": "That comment was peak cringe.",
+      "emojis": ["😬","🫠"],
+      "tags": ["insult","rating"]
+    },
+    {
+      "term": "bussin",
+      "meaning": "Extremely good (esp. food).",
+      "example": "These tacos are bussin fr fr.",
+      "emojis": ["🌮","🔥"],
+      "tags": ["food","rating"]
+    },
+    {
+      "term": "caught in 4k",
+      "meaning": "Caught with undeniable evidence.",
+      "example": "Screenshots? You’re caught in 4k.",
+      "emojis": ["📸","🎥"],
+      "tags": ["callout"]
+    },
+    {
+      "term": "plot armor",
+      "meaning": "Protected by circumstances; unlikely to fail.",
+      "example": "Main character had plot armor again.",
+      "emojis": ["🛡️","🎬"],
+      "tags": ["media","joke"]
+    },
+    {
+      "term": "brick",
+      "meaning": "A long time; ages.",
+      "example": "Haven’t seen you in a brick.",
+      "emojis": ["🧱","⏳"],
+      "tags": ["time"]
+    },
+    {
+      "term": "mewing",
+      "meaning": "Tongue posture trend for jawline.",
+      "example": "Bro started mewing last month.",
+      "emojis": ["👄","📈"],
+      "tags": ["trend"]
+    },
+    {
+      "term": "sneaky link",
+      "meaning": "Secret romantic/physical meetup.",
+      "example": "He left for a sneaky link.",
+      "emojis": ["🕶️","🤫"],
+      "tags": ["dating"]
+    },
+    {
+      "term": "simp",
+      "meaning": "Overly attentive in hopes of affection.",
+      "example": "Buying four gifts? Simp behavior.",
+      "emojis": ["🫡","💐"],
+      "tags": ["dating","insult"]
+    },
+    {
+      "term": "op",
+      "meaning": "Opponent; your rival.",
+      "example": "Don’t tell the ops our plans.",
+      "emojis": ["🆚","🕵️"],
+      "tags": ["slang","conflict"]
+    },
+    {
+      "term": "lowkey highkey",
+      "meaning": "Secretly but also obviously.",
+      "example": "Lowkey highkey wanna move cities.",
+      "emojis": ["🤫","📢"],
+      "tags": ["mood","irony"]
+    },
+    {
+      "term": "side quest",
+      "meaning": "Random errand/task not part of the main plan.",
+      "example": "Grocery run turned into a side quest.",
+      "emojis": ["🗺️","🎮"],
+      "tags": ["gaming","joke"]
+    },
+    {
+      "term": "uncanny",
+      "meaning": "Creepy in a realistic way.",
+      "example": "That filter looks uncanny.",
+      "emojis": ["🫣","🧟"],
+      "tags": ["vibes","tech"]
+    },
+    {
+      "term": "gyatt",
+      "meaning": "Exclamation reacting to curves or surprising features.",
+      "example": "GYATT—did you see that fit?",
+      "emojis": ["😳","🗣️"],
+      "tags": ["reaction"]
+    },
+    {
+      "term": "door core",
+      "meaning": "Exploring random doors/liminal spaces aesthetic.",
+      "example": "This hallway is so door core.",
+      "emojis": ["🚪","🌫️"],
+      "tags": ["aesthetic","trend"]
+    },
+    {
+      "term": "brainrot",
+      "meaning": "Can’t stop thinking about something (often memes).",
+      "example": "This sound has me in brainrot.",
+      "emojis": ["🧠","🌀"],
+      "tags": ["internet","feelings"]
+    },
+    {
+      "term": "coquette",
+      "meaning": "Soft, girly aesthetic vibe.",
+      "example": "That bow dress is so coquette.",
+      "emojis": ["🎀","🌸"],
+      "tags": ["aesthetic","fashion"]
+    }
+]
+  
+
+   
