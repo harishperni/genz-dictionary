@@ -1,29 +1,29 @@
 {
-  "project_info": {
-    "project_number": "937792714102",
-    "project_id": "genz-dictionary-harish",
-    "storage_bucket": "genz-dictionary-harish.firebasestorage.app"
-  },
-  "client": [
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:937792714102:android:629689741a2f020a0ff657",
-        "android_client_info": {
-          "package_name": "com.example.genz_dictionary"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyCZzDiieEYcOmQX1Z5vSxIdEDmEbmMpO3c"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
+    "project_info": {
+      "project_number": "937792714102",
+      "project_id": "genz-dictionary-harish",
+      "storage_bucket": "genz-dictionary-harish.firebasestorage.app"
+    },
+    "client": [
+      {
+        "client_info": {
+          "mobilesdk_app_id": "1:937792714102:android:629689741a2f020a0ff657",
+          "android_client_info": {
+            "package_name": "com.example.genz_dictionary"
+          }
+        },
+        "oauth_client": [],
+        "api_key": [
+          {
+            "current_key": "AIzaSyCZzDiieEYcOmQX1Z5vSxIdEDmEbmMpO3c"
+          }
+        ],
+        "services": {
+          "appinvite_service": {
+            "other_platform_oauth_client": []
+          }
         }
       }
-    }
-  ],
-  "configuration_version": "1"
-}
+    ],
+    "configuration_version": "1"
+  }

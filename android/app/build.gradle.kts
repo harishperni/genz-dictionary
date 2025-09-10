@@ -1,57 +1,66 @@
+// android/app/build.gradle.kts (module-level)
 plugins {
     id("com.android.application")
     id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    // Must be after Android & Kotlin plugins
     id("dev.flutter.flutter-gradle-plugin")
-    // Firebase Google Services plugin
+    // Firebase (reads google-services.json)
     id("com.google.gms.google-services")
 }
 
 android {
     namespace = "com.example.genz_dictionary"
-    // Keep using Flutter’s values
+
+    // Provided by Flutter Gradle plugin
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = "29.0.13846066"
+    // If you need a pinned NDK, uncomment the next line and set your version:
+    // ndkVersion = "29.0.13846066"
 
+    // ✅ Java 17 + core desugaring (required by flutter_local_notifications 17.x)
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled = true
     }
-
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+        jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
     defaultConfig {
         applicationId = "com.example.genz_dictionary"
-
-        // Firebase Auth requires minSdk 23
-        minSdk = 23
+        // Firebase Auth requires at least 23
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
     buildTypes {
         release {
-            // Sign with debug for now so `flutter run --release` works
+            // Replace with a real signing config for release builds later
             signingConfig = signingConfigs.getByName("debug")
+            // Enables code shrinking/obfuscation if you want later:
+            // isMinifyEnabled = true
+            // proguardFiles(
+            //     getDefaultProguardFile("proguard-android-optimize.txt"),
+            //     "proguard-rules.pro"
+            // )
+        }
+    }
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
 }
 
 flutter {
+    // Path back to your Flutter project root (inner project)
     source = "../.."
 }
 
-// --- Firebase Android SDKs (required by Firebase Console “Add SDK” step)
 dependencies {
-    // Use the Firebase Bill of Materials to manage versions
-    implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
-
-    // Add the SDKs you need:
-    implementation("com.google.firebase:firebase-auth")
-    implementation("com.google.firebase:firebase-firestore")
-    // (Optional) others later: analytics, messaging, crashlytics, etc.
+    // ✅ Required when isCoreLibraryDesugaringEnabled = true
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }

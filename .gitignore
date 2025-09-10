@@ -5,59 +5,61 @@
 *.swp
 .DS_Store
 .atom/
-.build/
 .buildlog/
 .history
 .svn/
-.swiftpm/
-migrate_working_dir/
-
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
 .idea/
+*.iml
 
-# VS Code
-.vscode/
-
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
+# Flutter & Dart
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
+.packages
 .pub-cache/
 .pub/
-/build/
-
-# Android
-/android/.gradle/
-/android/captures/
-/android/app/debug
-/android/app/profile
-/android/app/release
-/android/local.properties
-**/*.keystore
-**/*.jks
+build/
+coverage/
+*.lock
 
 # iOS
 ios/Pods/
 ios/.symlinks/
 ios/Flutter/Flutter.framework
 ios/Flutter/Flutter.podspec
-ios/Flutter/Generated.xcconfig
+ios/ServiceDefinitions.json
+ios/Runner/GeneratedPluginRegistrant.*
+
+# Android
+android/.gradle/
+android/captures/
+android/app/build/
+android/local.properties
+android/key.properties
+android/.idea/
 
 # macOS
+macos/Flutter/GeneratedPluginRegistrant.swift
 macos/Flutter/ephemeral/
-macos/Pods/
 
-# Linux/Windows
+# Linux
 linux/flutter/ephemeral/
+
+# Windows
 windows/flutter/ephemeral/
 
-# Symbolication related
-app.*.symbols
+# Web
+web/.dart_tool/
+web/.firebase/
 
-# Obfuscation related
-app.*.map.json
+# Firebase
+**/google-services.json
+**/GoogleService-Info.plist
+
+# VS Code / IntelliJ
+.vscode/
+*.ipr
+*.iws
+
+# Others
+pubspec.lock

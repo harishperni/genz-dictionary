@@ -1,18 +1,4 @@
-import org.gradle.api.file.Directory
-
-// Add the Google Services classpath here (Kotlin DSL)
-buildscript {
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        // Firebase Google Services Gradle plugin
-        classpath("com.google.gms:google-services:4.4.2")
-    }
-}
-
-// Repos for all projects (what you already had)
+// android/build.gradle.kts  (project-level)
 allprojects {
     repositories {
         google()
@@ -20,8 +6,9 @@ allprojects {
     }
 }
 
-// Keep your custom build dir layout
-val newBuildDir: Directory = rootProject.layout.buildDirectory.dir("../../build").get()
+// Put all build outputs under the Flutter project's /build directory
+val newBuildDir: Directory = rootProject.layout.buildDirectory
+    .dir("../../build").get()
 rootProject.layout.buildDirectory.value(newBuildDir)
 
 subprojects {
@@ -29,12 +16,11 @@ subprojects {
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
 
-// Ensure :app is evaluated before others
+// Ensure :app is evaluated first
 subprojects {
     project.evaluationDependsOn(":app")
 }
 
-// Clean task
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
