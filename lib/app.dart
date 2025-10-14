@@ -1,6 +1,8 @@
 // lib/app.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
+import 'features/streak/debug_streak_panel.dart';
 
 // Screens
 import 'features/slang/ui/search_page.dart';
@@ -41,6 +43,12 @@ GoRouter buildRouter() => GoRouter(
               path: 'badges',
               name: 'badges',
               builder: (context, state) => const BadgesPage(),
+            ),
+            if (kDebugMode)
+            GoRoute(
+              path: 'debug-streak',
+              name: 'debug-streak',
+              builder: (context, state) => const DebugStreakPanel(),
             ),
           ],
         ),

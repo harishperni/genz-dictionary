@@ -1,9 +1,8 @@
-// lib/features/slang/ui/search_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../streak/streak_banner.dart';           // shared banner widget
+import '../../streak/streak_banner.dart'; // shared banner widget
 import '../app/slang_providers.dart';
 import '../domain/slang_entry.dart';
 import '../../../theme/app_theme.dart';
@@ -49,133 +48,148 @@ class _SearchPageState extends ConsumerState<SearchPage> {
           centerTitle: true,
         ),
         body: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // 🌟 Quick actions row directly under the title
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF5A2DF5), Color(0xFF6B34F0), Color(0xFF7C3AED)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(26),
-                    border: Border.all(color: Colors.white.withOpacity(0.10)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF7C3AED).withOpacity(0.25),
-                        blurRadius: 16,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: const [
-                      _TopQuickAction(
-                        icon: Icons.emoji_events_rounded,
-                        label: 'Badges',
-                        routeName: 'badges',
-                      ),
-                      _TopDivider(),
-                      _TopQuickAction(
-                        icon: Icons.favorite_rounded,
-                        label: 'Favorites',
-                        routeName: 'favorites',
-                      ),
-                      _TopDivider(),
-                      _TopQuickAction(
-                        icon: Icons.quiz_rounded,
-                        label: 'Quiz',
-                        routeName: 'quiz',
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // 🔥 Daily Streak banner
-              const StreakBanner(),
-
-              // ⭐️ Slang of the Day
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                child: sodAsync.when(
-                  data: (e) => _SlangOfDayCard(entry: e),
-                  loading: () => _glassShimmer(height: 88),
-                  error: (e, _) => const SizedBox.shrink(),
-                ),
-              ),
-
-              // 🔎 Search
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                child: TextField(
-                  controller: _controller,
-                  onChanged: (v) => setState(() => _q = v),
-                  decoration: InputDecoration(
-                    hintText: 'Search slang, meaning, tags…',
-                    prefixIcon: const Icon(Icons.search),
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.08),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),
-                    ),
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  ),
-                ),
-              ),
-
-              // 📜 Results
-              Expanded(
-                child: listAsync.when(
-                  data: (all) {
-                    final items = _filter(all, _q);
-                    if (items.isEmpty) {
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Text(
-                            'No results for "${_q.trim()}"',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // 🌟 Quick actions row
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 18, vertical: 14),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFF5A2DF5),
+                            Color(0xFF6B34F0),
+                            Color(0xFF7C3AED)
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                      );
-                    }
-                    return ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 96),
-                      itemCount: items.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
-                      itemBuilder: (context, i) {
-                        final e = items[i];
-                        return _SlangTile(entry: e);
-                      },
-                    );
-                  },
-                  loading: () => ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
-                    itemCount: 10,
-                    itemBuilder: (_, __) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: _glassShimmer(height: 64),
+                        borderRadius: BorderRadius.circular(26),
+                        border: Border.all(color: Colors.white.withOpacity(0.10)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF7C3AED).withOpacity(0.25),
+                            blurRadius: 16,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          _TopQuickAction(
+                            icon: Icons.emoji_events_rounded,
+                            label: 'Badges',
+                            routeName: 'badges',
+                          ),
+                          _TopDivider(),
+                          _TopQuickAction(
+                            icon: Icons.favorite_rounded,
+                            label: 'Favorites',
+                            routeName: 'favorites',
+                          ),
+                          _TopDivider(),
+                          _TopQuickAction(
+                            icon: Icons.quiz_rounded,
+                            label: 'Quiz',
+                            routeName: 'quiz',
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  error: (e, st) => Center(child: Text('Error: $e')),
-                ),
+
+                  // 🔥 Daily Streak banner
+                  const StreakBanner(),
+
+                  // ⭐️ Slang of the Day
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                    child: sodAsync.when(
+                      data: (e) => _SlangOfDayCard(entry: e),
+                      loading: () => _glassShimmer(height: 88),
+                      error: (e, _) => const SizedBox.shrink(),
+                    ),
+                  ),
+
+                  // 🔎 Search field
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                    child: TextField(
+                      controller: _controller,
+                      onChanged: (v) => setState(() => _q = v),
+                      decoration: InputDecoration(
+                        hintText: 'Search slang, meaning, tags…',
+                        prefixIcon: const Icon(Icons.search),
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.08),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide:
+                              BorderSide(color: Colors.white.withOpacity(0.15)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide:
+                              BorderSide(color: Colors.white.withOpacity(0.15)),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                      ),
+                    ),
+                  ),
+
+                  // 📜 Results list (scrollable inside a fixed height region)
+                  SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.65,
+                    child: listAsync.when(
+                      data: (all) {
+                        final items = _filter(all, _q);
+                        if (items.isEmpty) {
+                          return Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Text(
+                                'No results for "${_q.trim()}"',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+                        return ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(8, 0, 8, 96),
+                          itemCount: items.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 8),
+                          itemBuilder: (context, i) {
+                            final e = items[i];
+                            return _SlangTile(entry: e);
+                          },
+                        );
+                      },
+                      loading: () => ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
+                        itemCount: 10,
+                        itemBuilder: (_, __) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _glassShimmer(height: 64),
+                        ),
+                      ),
+                      error: (e, st) => Center(child: Text('Error: $e')),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -229,6 +243,7 @@ class _TopQuickAction extends StatelessWidget {
 
 class _TopDivider extends StatelessWidget {
   const _TopDivider();
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -266,7 +281,10 @@ class _SlangOfDayCard extends StatelessWidget {
             Expanded(
               child: Text(
                 'Slang of the Day: ${e.term}',
-                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                ),
               ),
             ),
             const Icon(Icons.chevron_right_rounded),
@@ -295,7 +313,7 @@ class _SlangTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
           children: [
-            // Leading emoji cluster (fits within width)
+            // Leading emoji cluster
             SizedBox(
               width: 56,
               child: FittedBox(
@@ -340,7 +358,7 @@ class _SlangTile extends StatelessWidget {
   }
 }
 
-// === Simple glass shimmer placeholder ===
+// === Simple shimmer placeholder ===
 Widget _glassShimmer({double height = 60}) {
   return Container(
     height: height,

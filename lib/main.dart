@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';     // ✅ add this
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'app.dart';
@@ -11,38 +12,44 @@ import 'core/push/push_service.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Keep minimal to avoid blocking/background crashes
+  // Minimal background setup
   await Firebase.initializeApp();
 }
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Required before using any Firebase services your home screen needs
+  // ✅ Initialize Firebase first
   await Firebase.initializeApp();
 
-  // Init local notifications + FCM foreground handling
+  // ✅ Ensure there's always a signed-in user (anonymous if needed)
+  final auth = FirebaseAuth.instance;
+  if (auth.currentUser == null) {
+    await auth.signInAnonymously();
+    debugPrint('✅ Signed in anonymously as ${auth.currentUser!.uid}');
+  }
+
+  // ✅ Init notifications + FCM
   await PushService.init();
 
-  // Wire FCM listeners (these don’t block UI)
+  // ✅ Wire up background and foreground message handling
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   FirebaseMessaging.onMessage.listen((RemoteMessage m) {
-    // Show a local notification while app is in foreground
     PushService.showForegroundNotification(m);
   });
   FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage m) {
-    // (Optional) route based on m.data later if you want
+    // optional: route handling later
   });
 
-  // Do NOT block first frame for scheduling; run it after the app paints
-  // so splash screen doesn’t sit there forever.
+  // ✅ Schedule daily push reminder asynchronously
   Future.microtask(() async {
     try {
       await PushService.ensureDailyNudgeScheduledOnce();
     } catch (_) {
-      // swallow—scheduling can be retried later if needed
+      // ignore errors silently
     }
   });
 
+  // ✅ Finally run app
   runApp(const ProviderScope(child: GenZApp()));
 }

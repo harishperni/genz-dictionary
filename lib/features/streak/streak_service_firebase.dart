@@ -1,26 +1,31 @@
-// lib/features/streak/streak_service_firebase.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-/// Firestore doc shape at users/{uid}
-/// {
+/// Firestore doc structure:
+/// users/{uid} → {
 ///   currentStreak: int,
 ///   highestStreak: int,
-///   lastActiveDate: String (ISO),
-///   rewardsClaimed: List<int>,
+///   lastActiveDate: String,
+///   rewardsClaimed: [int],
 ///   wordsViewed: int,
+///   wordsToday: int,
+///   lastWordXPDate: String,
 ///   sharesCount: int,
-///   badgesUnlocked: List<String>
+///   xp: int,
+///   level: int,
+///   badgesUnlocked: [String]
 /// }
+
 class StreakFB {
   final int currentStreak;
   final int highestStreak;
   final DateTime? lastActiveDate;
   final List<int> rewardsClaimed;
 
-  // Progress fields:
   final int wordsViewed;
   final int sharesCount;
+  final int xp;
+  final int level;
   final List<String> badgesUnlocked;
 
   const StreakFB({
@@ -30,6 +35,8 @@ class StreakFB {
     required this.rewardsClaimed,
     required this.wordsViewed,
     required this.sharesCount,
+    required this.xp,
+    required this.level,
     required this.badgesUnlocked,
   });
 
@@ -40,6 +47,8 @@ class StreakFB {
         rewardsClaimed: <int>[],
         wordsViewed: 0,
         sharesCount: 0,
+        xp: 0,
+        level: 1,
         badgesUnlocked: <String>[],
       );
 
@@ -52,12 +61,14 @@ class StreakFB {
           ? DateTime.tryParse(m['lastActiveDate'])
           : null,
       rewardsClaimed: (m['rewardsClaimed'] is List)
-          ? List<int>.from(m['rewardsClaimed'] as List)
+          ? List<int>.from(m['rewardsClaimed'])
           : <int>[],
       wordsViewed: (m['wordsViewed'] ?? 0) as int,
       sharesCount: (m['sharesCount'] ?? 0) as int,
+      xp: (m['xp'] ?? 0) as int,
+      level: (m['level'] ?? 1) as int,
       badgesUnlocked: (m['badgesUnlocked'] is List)
-          ? List<String>.from(m['badgesUnlocked'] as List)
+          ? List<String>.from(m['badgesUnlocked'])
           : <String>[],
     );
   }
@@ -69,28 +80,10 @@ class StreakFB {
         'rewardsClaimed': rewardsClaimed,
         'wordsViewed': wordsViewed,
         'sharesCount': sharesCount,
+        'xp': xp,
+        'level': level,
         'badgesUnlocked': badgesUnlocked,
       };
-
-  StreakFB copyWith({
-    int? currentStreak,
-    int? highestStreak,
-    DateTime? lastActiveDate,
-    List<int>? rewardsClaimed,
-    int? wordsViewed,
-    int? sharesCount,
-    List<String>? badgesUnlocked,
-  }) {
-    return StreakFB(
-      currentStreak: currentStreak ?? this.currentStreak,
-      highestStreak: highestStreak ?? this.highestStreak,
-      lastActiveDate: lastActiveDate ?? this.lastActiveDate,
-      rewardsClaimed: rewardsClaimed ?? this.rewardsClaimed,
-      wordsViewed: wordsViewed ?? this.wordsViewed,
-      sharesCount: sharesCount ?? this.sharesCount,
-      badgesUnlocked: badgesUnlocked ?? this.badgesUnlocked,
-    );
-  }
 }
 
 class StreakServiceFirebase {
@@ -106,8 +99,9 @@ class StreakServiceFirebase {
 
   DateTime _justDate(DateTime d) => DateTime(d.year, d.month, d.day);
 
-  // ---------- Badge IDs ----------
-  // Streak
+  // ---------- BADGE CONSTANTS ----------
+
+  // 🔥 Streak
   static const String bStreak3 = 'streak_3';
   static const String bStreak7 = 'streak_7';
   static const String bStreak14 = 'streak_14';
@@ -116,21 +110,57 @@ class StreakServiceFirebase {
   static const String bStreak100 = 'streak_100';
   static const String bStreak365 = 'streak_365';
 
-  // Usage
+  // 📚 Usage
   static const String bFirstWord = 'first_word';
   static const String bWords10 = 'words_10';
   static const String bWords50 = 'words_50';
   static const String bWords100 = 'words_100';
+  static const String bWords250 = 'words_250';
+  static const String bWords500 = 'words_500';
 
-  // Behavior / Misc
-  static const String bFirstClaim = 'first_claim';
+  // 💬 Sharing & Community
   static const String bShared1 = 'shared_1';
-  static const String bNightOwl = 'night_owl';
+  static const String bShared5 = 'shared_5';
+  static const String bShared25 = 'shared_25';
+  static const String bShared50 = 'shared_50';
+  static const String bInvite1 = 'invite_1';
+  static const String bInvite5 = 'invite_5';
+
+  // ⏰ Behavior
   static const String bEarlyBird = 'early_bird';
+  static const String bNightOwl = 'night_owl';
   static const String bWeekendWarrior = 'weekend_warrior';
   static const String bComebackKid = 'comeback_kid';
 
-  /// Call at app open. Handles streak math and auto-unlocks time-based badges.
+  // 💎 Milestones / Loyalty
+  static const String bFirstClaim = 'first_claim';
+  static const String bMonthUser = 'account_30d';
+  static const String bYearUser = 'account_365d';
+  static const String bFeedbackGiven = 'feedback_given';
+
+  // ---------- XP SYSTEM ----------
+
+  Future<void> addXP(int amount) async {
+    final ref = _doc();
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      final curXP = (snap.data()?['xp'] ?? 0) as int;
+      final newXP = curXP + amount;
+
+      int newLevel = 1;
+      if (newXP >= 10000) newLevel = 7;
+      else if (newXP >= 5000) newLevel = 6;
+      else if (newXP >= 2500) newLevel = 5;
+      else if (newXP >= 1000) newLevel = 4;
+      else if (newXP >= 500) newLevel = 3;
+      else if (newXP >= 100) newLevel = 2;
+
+      tx.update(ref, {'xp': newXP, 'level': newLevel});
+    });
+  }
+
+  // ---------- DAILY STREAK ----------
+
   Future<StreakFB> touchToday() async {
     return _db.runTransaction((tx) async {
       final ref = _doc();
@@ -153,37 +183,29 @@ class StreakServiceFirebase {
         } else if (diff == 1) {
           streak += 1;
         } else if (diff > 1) {
-          // missed days → reset + comeback badge
           streak = 1;
           _addBadgeInTx(tx, ref, bComebackKid);
         }
       }
       if (streak > best) best = streak;
 
-      final next = cur.copyWith(
-        currentStreak: streak,
-        highestStreak: best,
-        lastActiveDate: today,
-      );
+      final next = cur.toMap()
+        ..['currentStreak'] = streak
+        ..['highestStreak'] = best
+        ..['lastActiveDate'] = today.toIso8601String();
       if (snap.exists) {
-        tx.update(ref, next.toMap());
+        tx.update(ref, next);
       } else {
-        tx.set(ref, next.toMap());
+        tx.set(next);
       }
 
-      // Auto-unlock streak badges
-      _checkAndUnlockStreakBadges(tx, ref, next);
+      _checkAndUnlockStreakBadges(tx, ref, streak);
+      _addXPInTx(tx, ref, 10); // +10 XP for daily open
 
-      // Time-of-day badges
       final hour = now.hour;
-      if (hour < 7) {
-        _addBadgeInTx(tx, ref, bEarlyBird);
-      } else if (hour >= 23) {
-        _addBadgeInTx(tx, ref, bNightOwl);
-      }
+      if (hour < 7) _addBadgeInTx(tx, ref, bEarlyBird);
+      if (hour >= 23) _addBadgeInTx(tx, ref, bNightOwl);
 
-      // Weekend Warrior helper markers (simple MVP):
-      // add 'wknd_sat' / 'wknd_sun', then collapse into main badge.
       if (today.weekday == DateTime.saturday) {
         _addBadgeInTx(tx, ref, 'wknd_sat');
       } else if (today.weekday == DateTime.sunday) {
@@ -191,34 +213,12 @@ class StreakServiceFirebase {
       }
       _tryUnlockWeekendWarrior(tx, ref);
 
-      return next;
+      return StreakFB.fromMap(next);
     });
   }
 
-  Future<StreakFB> getCurrent() async {
-    final snap = await _doc().get();
-    return StreakFB.fromMap(snap.data());
-  }
+  // ---------- WORD VIEW TRACKING (with XP CAP) ----------
 
-  /// Milestone claim (3/7/14/30/60/100/365). Also unlocks first-claim badge.
-  Future<void> claim(int day) async {
-    final ref = _doc();
-    await _db.runTransaction((tx) async {
-      final snap = await tx.get(ref);
-      final cur = StreakFB.fromMap(snap.data());
-      if (!cur.rewardsClaimed.contains(day)) {
-        final updated = List<int>.from(cur.rewardsClaimed)..add(day);
-        if (snap.exists) {
-          tx.update(ref, {'rewardsClaimed': updated});
-        } else {
-          tx.set(ref, cur.copyWith(rewardsClaimed: updated).toMap());
-        }
-        _addBadgeInTx(tx, ref, bFirstClaim);
-      }
-    });
-  }
-
-  /// Track a slang view; unlock usage badges on thresholds.
   Future<void> trackWordViewed() async {
     final ref = _doc();
     await _db.runTransaction((tx) async {
@@ -226,20 +226,41 @@ class StreakServiceFirebase {
       final cur = StreakFB.fromMap(snap.data());
       final count = cur.wordsViewed + 1;
 
-      if (snap.exists) {
-        tx.update(ref, {'wordsViewed': count});
-      } else {
-        tx.set(ref, cur.copyWith(wordsViewed: count).toMap());
+      tx.update(ref, {'wordsViewed': count});
+
+      // Daily XP cap (max 10 slang views/day)
+      final today = DateTime.now();
+      final lastXPDateStr = snap.data()?['lastWordXPDate'] as String?;
+      final lastXPDate = lastXPDateStr != null ? DateTime.tryParse(lastXPDateStr) : null;
+      int wordsToday = (snap.data()?['wordsToday'] ?? 0) as int;
+
+      final todayIso = DateTime(today.year, today.month, today.day).toIso8601String();
+      final newDay = lastXPDate == null ||
+          _justDate(lastXPDate) != _justDate(today);
+
+      if (newDay) wordsToday = 0;
+
+      if (wordsToday < 10) {
+        wordsToday += 1;
+        tx.update(ref, {
+          'wordsToday': wordsToday,
+          'lastWordXPDate': todayIso,
+        });
+        _addXPInTx(tx, ref, 2); // +2 XP per word (capped at 10/day)
       }
 
+      // Badge unlocks
       if (count >= 1) _addBadgeInTx(tx, ref, bFirstWord);
       if (count >= 10) _addBadgeInTx(tx, ref, bWords10);
       if (count >= 50) _addBadgeInTx(tx, ref, bWords50);
       if (count >= 100) _addBadgeInTx(tx, ref, bWords100);
+      if (count >= 250) _addBadgeInTx(tx, ref, bWords250);
+      if (count >= 500) _addBadgeInTx(tx, ref, bWords500);
     });
   }
 
-  /// Track a share action; unlock 'shared_1'.
+  // ---------- SHARE TRACKING ----------
+
   Future<void> trackShared() async {
     final ref = _doc();
     await _db.runTransaction((tx) async {
@@ -247,77 +268,54 @@ class StreakServiceFirebase {
       final cur = StreakFB.fromMap(snap.data());
       final count = cur.sharesCount + 1;
 
-      if (snap.exists) {
-        tx.update(ref, {'sharesCount': count});
-      } else {
-        tx.set(ref, cur.copyWith(sharesCount: count).toMap());
-      }
+      tx.update(ref, {'sharesCount': count});
+      _addXPInTx(tx, ref, 15); // +15 XP per share
 
       if (count >= 1) _addBadgeInTx(tx, ref, bShared1);
+      if (count >= 5) _addBadgeInTx(tx, ref, bShared5);
+      if (count >= 25) _addBadgeInTx(tx, ref, bShared25);
+      if (count >= 50) _addBadgeInTx(tx, ref, bShared50);
     });
   }
 
-  /// Realtime updates so your UI stays in sync.
-  Stream<StreakFB> watch() =>
-      _doc().snapshots().map((s) => StreakFB.fromMap(s.data()));
+  // ---------- CLAIM REWARDS ----------
 
-  // ---------- Debug helpers (optional) ----------
-  Future<void> debugPrepareForDay(int targetDay) async {
-    if (targetDay < 1) return;
+  Future<void> claim(int day) async {
     final ref = _doc();
-    final now = DateTime.now();
-    final today = _justDate(now);
-    final yesterday = today.subtract(const Duration(days: 1));
     await _db.runTransaction((tx) async {
       final snap = await tx.get(ref);
       final cur = StreakFB.fromMap(snap.data());
-      final prepared = cur.copyWith(
-        currentStreak: targetDay - 1,
-        highestStreak:
-            (targetDay - 1) > cur.highestStreak ? (targetDay - 1) : cur.highestStreak,
-        lastActiveDate: yesterday,
-      );
-      if (snap.exists) {
-        tx.update(ref, prepared.toMap());
-      } else {
-        tx.set(ref, prepared.toMap());
+      if (!cur.rewardsClaimed.contains(day)) {
+        final updated = List<int>.from(cur.rewardsClaimed)..add(day);
+        tx.update(ref, {'rewardsClaimed': updated});
+        _addBadgeInTx(tx, ref, bFirstClaim);
+        _addXPInTx(tx, ref, 50); // bonus XP for milestone claim
       }
     });
   }
 
-  Future<void> debugUnclaim(int day) async {
-    final ref = _doc();
-    await ref.update({'rewardsClaimed': FieldValue.arrayRemove([day])});
-  }
+  // ---------- HELPERS ----------
 
-  // ---------- Private helpers ----------
   void _addBadgeInTx(
     Transaction tx,
     DocumentReference<Map<String, dynamic>> ref,
     String id,
   ) {
-    tx.update(ref, {
-      'badgesUnlocked': FieldValue.arrayUnion([id]),
-    });
+    tx.update(ref, {'badgesUnlocked': FieldValue.arrayUnion([id])});
   }
 
-  void _tryUnlockWeekendWarrior(
+  void _addXPInTx(
     Transaction tx,
     DocumentReference<Map<String, dynamic>> ref,
+    int amount,
   ) {
-    // Remove markers if present, then add the main badge (idempotent).
-    tx.update(ref, {
-      'badgesUnlocked': FieldValue.arrayRemove(['wknd_sat', 'wknd_sun']),
-    });
-    tx.update(ref, {
-      'badgesUnlocked': FieldValue.arrayUnion([bWeekendWarrior]),
-    });
+    tx.update(ref, {'xp': FieldValue.increment(amount)});
   }
 
   void _checkAndUnlockStreakBadges(
     Transaction tx,
     DocumentReference<Map<String, dynamic>> ref,
-    StreakFB s,
+    int streak,
   ) {
     final thresholds = <int, String>{
       3: bStreak3,
@@ -329,9 +327,36 @@ class StreakServiceFirebase {
       365: bStreak365,
     };
     for (final e in thresholds.entries) {
-      if (s.currentStreak >= e.key) {
-        tx.update(ref, {'badgesUnlocked': FieldValue.arrayUnion([e.value])});
-      }
+      if (streak >= e.key) _addBadgeInTx(tx, ref, e.value);
     }
+  }
+
+  void _tryUnlockWeekendWarrior(
+    Transaction tx,
+    DocumentReference<Map<String, dynamic>> ref,
+  ) {
+    tx.update(ref, {
+      'badgesUnlocked': FieldValue.arrayRemove(['wknd_sat', 'wknd_sun']),
+    });
+    tx.update(ref, {
+      'badgesUnlocked': FieldValue.arrayUnion([bWeekendWarrior]),
+    });
+  }
+
+  // ---------- STREAM ----------
+  Stream<StreakFB> watch() =>
+      _doc().snapshots().map((s) => StreakFB.fromMap(s.data()));
+
+  // ---------- DEBUG ----------
+  Future<void> debugResetAll() async {
+    await _doc().set(StreakFB.initial().toMap());
+  }
+
+  Future<void> debugAddBadge(String id) async {
+    await _doc().update({'badgesUnlocked': FieldValue.arrayUnion([id])});
+  }
+
+  Future<void> debugRemoveBadge(String id) async {
+    await _doc().update({'badgesUnlocked': FieldValue.arrayRemove([id])});
   }
 }

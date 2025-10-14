@@ -1,4 +1,3 @@
-// lib/core/push/push_service.dart
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -27,14 +26,14 @@ class PushService {
 
   // -------------------- PUBLIC API --------------------
 
-  /// Idempotent init: safe to call multiple times.
+  /// Idempotent init — safe to call multiple times.
   static Future<void> init() async {
     if (_didInit) return;
     _didInit = true;
 
     final sw = Stopwatch()..start();
 
-    // 1) Local notifications (fast)
+    // 1) Local notifications
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const initSettings = InitializationSettings(android: androidInit);
     await _fln.initialize(
@@ -44,7 +43,7 @@ class PushService {
       },
     );
 
-    // Create channel once
+    // Create notification channel once
     const channel = AndroidNotificationChannel(
       _channelId,
       _channelName,
@@ -56,22 +55,18 @@ class PushService {
             AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(channel);
 
-    // Android 13+ permission for local notifications
+    // Android 13+ runtime notification permission
     await _fln
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
         ?.requestNotificationsPermission();
 
-    // 2) FCM permissions/token
-    await _fcm.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    // 2) FCM permissions + token
+    await _fcm.requestPermission(alert: true, badge: true, sound: true);
     final token = await _fcm.getToken();
     debugPrint('🔑 FCM token: $token');
 
-    // 3) Foreground listener → show a tray banner
+    // 3) Foreground listener → show banner
     _fgSub?.cancel();
     _fgSub = FirebaseMessaging.onMessage.listen((m) async {
       final n = m.notification;
@@ -80,29 +75,30 @@ class PushService {
       await showForegroundNotification(m);
     });
 
-    // 4) Opened listener (tap on notif)
+    // 4) Notification tap listener
     _openedSub?.cancel();
     _openedSub = FirebaseMessaging.onMessageOpenedApp.listen((m) {
       debugPrint('🚪 [OPENED] data=${m.data}');
       _onOpenedCallback?.call(m);
     });
 
-    // 5) Schedule daily nudge lazily (after small delay) & only once
-    //    This avoids blocking init with timezone data load.
+    // 5) Schedule daily nudge lazily (don’t block init)
     Future<void>(() async {
+      await Future.delayed(const Duration(milliseconds: 100));
       await ensureDailyNudgeScheduledOnce();
     });
 
     debugPrint('⚙️ PushService.init in ${sw.elapsedMilliseconds}ms');
   }
 
-  static Future<RemoteMessage?> getInitialMessage() {
-    return _fcm.getInitialMessage();
-  }
+  static Future<RemoteMessage?> getInitialMessage() =>
+      _fcm.getInitialMessage();
 
   static void onOpened(void Function(RemoteMessage message) cb) {
     _onOpenedCallback = cb;
   }
+
+  // -------------------- NOTIFICATIONS --------------------
 
   static Future<void> showForegroundNotification(RemoteMessage m) async {
     final n = m.notification;
@@ -128,19 +124,18 @@ class PushService {
     );
   }
 
-  /// Schedules 8pm local nudge once; safe to call repeatedly.
+  /// Schedules 8 PM local nudge once; safe to call repeatedly.
   static Future<void> ensureDailyNudgeScheduledOnce() async {
     final prefs = await SharedPreferences.getInstance();
     const key = 'daily_nudge_scheduled_v1';
-    if (prefs.getBool(key) == true) {
-      return;
-    }
+    if (prefs.getBool(key) == true) return;
+
     await _lazyInitTimezone();
-    await scheduleDailyNudge();        // schedules from "now" to next 8pm
+    await scheduleDailyNudge(); // schedules from "now" to next 8 PM
     await prefs.setBool(key, true);
   }
 
-  /// Schedule a daily 8 PM nudge (call via ensureDailyNudgeScheduledOnce()).
+  /// Schedules a daily 8 PM nudge (call via ensureDailyNudgeScheduledOnce()).
   static Future<void> scheduleDailyNudge({
     TimeOfDay at = const TimeOfDay(hour: 20, minute: 0),
     String title = 'Keep your streak 🔥',
@@ -171,24 +166,45 @@ class PushService {
     );
     const details = NotificationDetails(android: android);
 
-    await _fln.zonedSchedule(
-      8000,
-      title,
-      body,
-      first,
-      details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      matchDateTimeComponents: DateTimeComponents.time,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-    );
+    // ✅ Request exact-alarm permission on Android 12+
+    final androidImpl = _fln.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
 
-    final hh = at.hour.toString().padLeft(2, '0');
-    final mm = at.minute.toString().padLeft(2, '0');
-    debugPrint('⏰ Daily nudge scheduled at $hh:$mm');
+    bool canSchedule = true;
+    try {
+      canSchedule = await androidImpl?.requestExactAlarmsPermission() ?? true;
+    } catch (e) {
+      debugPrint('⚠️ Exact-alarm permission check failed: $e');
+    }
+
+    if (canSchedule) {
+      await _fln.zonedSchedule(
+        8000,
+        title,
+        body,
+        first,
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        matchDateTimeComponents: DateTimeComponents.time,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+      debugPrint('⏰ Daily nudge scheduled for ${at.hour}:${at.minute}');
+    } else {
+      // 🚑 Fallback for denied permission
+      debugPrint('⚠️ Exact alarms not permitted — using periodic reminder.');
+      await _fln.periodicallyShow(
+        8001,
+        title,
+        body,
+        RepeatInterval.daily,
+        details,
+        androidAllowWhileIdle: true,
+      );
+    }
   }
 
-  /// TEMP: one-off local test to prove channel works. Call once & remove.
+  /// One-off local test to confirm channel works.
   static Future<void> testLocal() async {
     const android = AndroidNotificationDetails(
       _channelId,
@@ -212,17 +228,15 @@ class PushService {
   static Future<void> _lazyInitTimezone() async {
     if (_tzReady) return;
     final sw = Stopwatch()..start();
-    tzdata.initializeTimeZones();         // heavy; do once
-    // Best effort: pick current local zone; tzdb maps by name/offset
+    tzdata.initializeTimeZones(); // heavy; do once
     final now = DateTime.now();
     try {
       tz.setLocalLocation(tz.getLocation(now.timeZoneName));
     } catch (_) {
-      // Fallback to UTC if mapping fails
       tz.setLocalLocation(tz.getLocation('UTC'));
     }
     _tzReady = true;
-    debugPrint('🕒 tz init in ${sw.elapsedMilliseconds}ms');
+    debugPrint('🕒 tz init in ${sw.elapsedMilliseconds} ms');
   }
 
   static String? _encodeSimplePayload(Map<String, dynamic> data) {
