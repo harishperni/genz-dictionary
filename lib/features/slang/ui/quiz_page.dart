@@ -1,3 +1,4 @@
+// lib/features/slang/ui/quiz_page.dart
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +11,9 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../../theme/app_theme.dart';
 import '../quiz/quiz_controller.dart';
 import '../app/slang_providers.dart';
+
+// ✅ Add this import for XP tracking
+import '../../streak/streak_controller_firebase.dart';
 
 class QuizPage extends ConsumerWidget {
   const QuizPage({super.key});
@@ -92,7 +96,7 @@ class _QuizBody extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
 
-          // Options (with correct/wrong coloring after a choice)
+          // Options (colored when answered)
           ...q.options.map((opt) {
             final selected = state.selected;
 
@@ -120,7 +124,15 @@ class _QuizBody extends ConsumerWidget {
             return Container(
               margin: const EdgeInsets.only(bottom: 10),
               child: InkWell(
-                onTap: selected == null ? () => ctrl.select(opt) : null,
+                onTap: selected == null
+                    ? () {
+                        ctrl.select(opt);
+                        // ✅ Award XP for correct answer (next step)
+                        if (opt == correct) {
+                          ref.read(streakFBProvider.notifier).trackQuizXP();
+                        }
+                      }
+                    : null,
                 borderRadius: BorderRadius.circular(14),
                 child: Container(
                   width: double.infinity,
@@ -176,7 +188,7 @@ class _QuizBody extends ConsumerWidget {
 }
 
 /// Finished screen with shareable result card + confetti + QR code
-class _Finished extends StatefulWidget {
+class _Finished extends ConsumerStatefulWidget {
   final int score;
   final int total;
   final VoidCallback onRetry;
@@ -188,14 +200,13 @@ class _Finished extends StatefulWidget {
   });
 
   @override
-  State<_Finished> createState() => _FinishedState();
+  ConsumerState<_Finished> createState() => _FinishedState();
 }
 
-class _FinishedState extends State<_Finished> {
+class _FinishedState extends ConsumerState<_Finished> {
   final ScreenshotController _shot = ScreenshotController();
   late final ConfettiController _confetti;
 
-  // TODO: Replace with your real Play Store URL when published
   static const String _appUrl =
       'https://play.google.com/store/apps/details?id=com.example.genz_dictionary';
 
@@ -220,33 +231,38 @@ class _FinishedState extends State<_Finished> {
     return 'A lil delulu… but learning! 🤓';
   }
 
-  Future<void> _share() async {
-    _confetti.play(); // celebrate again on share
+  Future<void> _onShareQuizResult() async {
+    _confetti.play();
     final img = await _shot.capture(pixelRatio: ui.window.devicePixelRatio);
     if (img == null) return;
+
     final file = XFile.fromData(
       img,
       name: 'genz_quiz_${DateTime.now().millisecondsSinceEpoch}.png',
       mimeType: 'image/png',
     );
-    await Share.shareXFiles(
+
+    final result = await Share.shareXFiles(
       [file],
       text:
           'I scored ${widget.score}/${widget.total} on the Gen Z Dictionary Quiz! $_appUrl',
     );
+
+    if (result.status == ShareResultStatus.success) {
+      // ✅ Only give XP if share was actually completed
+      await ref.read(streakFBProvider.notifier).trackShared();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // Confetti overlay
         Align(
           alignment: Alignment.topCenter,
           child: ConfettiWidget(
             confettiController: _confetti,
             blastDirectionality: BlastDirectionality.explosive,
-            shouldLoop: false,
             emissionFrequency: 0.05,
             numberOfParticles: 30,
             maxBlastForce: 30,
@@ -261,20 +277,17 @@ class _FinishedState extends State<_Finished> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Shareable result card (RECTANGULAR, no rounded corners, no shadow)
               Screenshot(
                 controller: _shot,
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(24),
                   decoration: const BoxDecoration(
-                    // Solid gradient to avoid transparency / checkerboard
                     gradient: LinearGradient(
                       colors: [Color(0xFF8E2DE2), Color(0xFF4A00E0)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
-                    // NOTE: No borderRadius, no boxShadow -> perfect rectangle
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -294,7 +307,6 @@ class _FinishedState extends State<_Finished> {
                           color: Colors.white,
                           fontSize: 48,
                           fontWeight: FontWeight.w900,
-                          letterSpacing: 1.2,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -306,29 +318,18 @@ class _FinishedState extends State<_Finished> {
                         ),
                       ),
                       const SizedBox(height: 16),
-
-                      // Bottom row: QR + branding
                       Row(
                         children: [
-                          // QR with white background so it scans cleanly
                           Container(
                             padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
                               color: Colors.white,
-                              borderRadius: BorderRadius.circular(8), // keep QR readable
+                              borderRadius: BorderRadius.circular(8),
                             ),
                             child: QrImageView(
                               data: _appUrl,
                               size: 84,
                               backgroundColor: Colors.white,
-                              eyeStyle: const QrEyeStyle(
-                                eyeShape: QrEyeShape.square,
-                                color: Colors.black,
-                              ),
-                              dataModuleStyle: const QrDataModuleStyle(
-                                dataModuleShape: QrDataModuleShape.square,
-                                color: Colors.black,
-                              ),
                             ),
                           ),
                           const Spacer(),
@@ -349,12 +350,11 @@ class _FinishedState extends State<_Finished> {
 
               const SizedBox(height: 20),
 
-              // Actions
               Row(
                 children: [
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: _share,
+                      onPressed: _onShareQuizResult,
                       icon: const Icon(Icons.share_rounded),
                       label: const Text('Share result'),
                     ),

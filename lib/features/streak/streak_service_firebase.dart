@@ -21,12 +21,10 @@ class StreakFB {
   final int highestStreak;
   final DateTime? lastActiveDate;
   final List<int> rewardsClaimed;
-
   final int wordsViewed;
   final int sharesCount;
-  final int xp;
-  final int level;
   final List<String> badgesUnlocked;
+  final int xp; // 🆕 optional XP field
 
   const StreakFB({
     required this.currentStreak,
@@ -35,9 +33,8 @@ class StreakFB {
     required this.rewardsClaimed,
     required this.wordsViewed,
     required this.sharesCount,
-    required this.xp,
-    required this.level,
     required this.badgesUnlocked,
+    this.xp = 0,
   });
 
   factory StreakFB.initial() => const StreakFB(
@@ -47,9 +44,8 @@ class StreakFB {
         rewardsClaimed: <int>[],
         wordsViewed: 0,
         sharesCount: 0,
-        xp: 0,
-        level: 1,
         badgesUnlocked: <String>[],
+        xp: 0,
       );
 
   factory StreakFB.fromMap(Map<String, dynamic>? m) {
@@ -61,15 +57,14 @@ class StreakFB {
           ? DateTime.tryParse(m['lastActiveDate'])
           : null,
       rewardsClaimed: (m['rewardsClaimed'] is List)
-          ? List<int>.from(m['rewardsClaimed'])
+          ? List<int>.from(m['rewardsClaimed'] as List)
           : <int>[],
       wordsViewed: (m['wordsViewed'] ?? 0) as int,
       sharesCount: (m['sharesCount'] ?? 0) as int,
-      xp: (m['xp'] ?? 0) as int,
-      level: (m['level'] ?? 1) as int,
       badgesUnlocked: (m['badgesUnlocked'] is List)
-          ? List<String>.from(m['badgesUnlocked'])
+          ? List<String>.from(m['badgesUnlocked'] as List)
           : <String>[],
+      xp: (m['xp'] ?? 0) as int,
     );
   }
 
@@ -80,10 +75,32 @@ class StreakFB {
         'rewardsClaimed': rewardsClaimed,
         'wordsViewed': wordsViewed,
         'sharesCount': sharesCount,
-        'xp': xp,
-        'level': level,
         'badgesUnlocked': badgesUnlocked,
+        'xp': xp,
       };
+
+  // ✅ RE-ADD THIS:
+  StreakFB copyWith({
+    int? currentStreak,
+    int? highestStreak,
+    DateTime? lastActiveDate,
+    List<int>? rewardsClaimed,
+    int? wordsViewed,
+    int? sharesCount,
+    List<String>? badgesUnlocked,
+    int? xp,
+  }) {
+    return StreakFB(
+      currentStreak: currentStreak ?? this.currentStreak,
+      highestStreak: highestStreak ?? this.highestStreak,
+      lastActiveDate: lastActiveDate ?? this.lastActiveDate,
+      rewardsClaimed: rewardsClaimed ?? this.rewardsClaimed,
+      wordsViewed: wordsViewed ?? this.wordsViewed,
+      sharesCount: sharesCount ?? this.sharesCount,
+      badgesUnlocked: badgesUnlocked ?? this.badgesUnlocked,
+      xp: xp ?? this.xp,
+    );
+  }
 }
 
 class StreakServiceFirebase {
@@ -161,101 +178,136 @@ class StreakServiceFirebase {
 
   // ---------- DAILY STREAK ----------
 
-  Future<StreakFB> touchToday() async {
-    return _db.runTransaction((tx) async {
-      final ref = _doc();
-      final snap = await tx.get(ref);
-      final cur = StreakFB.fromMap(snap.data());
+  // ---------- DAILY STREAK ----------
+Future<StreakFB> touchToday() async {
+  return _db.runTransaction((tx) async {
+    final ref = _doc();
+    final snap = await tx.get(ref);
+    final cur = StreakFB.fromMap(snap.data());
 
-      final now = DateTime.now();
-      final today = _justDate(now);
-      final last = cur.lastActiveDate == null ? null : _justDate(cur.lastActiveDate!);
+    final now = DateTime.now();
+    final today = _justDate(now);
+    final last = cur.lastActiveDate == null ? null : _justDate(cur.lastActiveDate!);
 
-      int streak = cur.currentStreak;
-      int best = cur.highestStreak;
+    int streak = cur.currentStreak;
+    int best = cur.highestStreak;
 
-      if (last == null) {
+    // ----- Handle streak increment -----
+    if (last == null) {
+      streak = 1;
+    } else {
+      final diff = today.difference(last).inDays;
+      if (diff == 0) {
+        // already counted today
+      } else if (diff == 1) {
+        streak += 1;
+      } else if (diff > 1) {
         streak = 1;
-      } else {
-        final diff = today.difference(last).inDays;
-        if (diff == 0) {
-          // already counted today
-        } else if (diff == 1) {
-          streak += 1;
-        } else if (diff > 1) {
-          streak = 1;
-          _addBadgeInTx(tx, ref, bComebackKid);
-        }
+        _addBadgeInTx(tx, ref, bComebackKid);
       }
-      if (streak > best) best = streak;
+    }
+    if (streak > best) best = streak;
 
-      final next = cur.toMap()
-        ..['currentStreak'] = streak
-        ..['highestStreak'] = best
-        ..['lastActiveDate'] = today.toIso8601String();
-      if (snap.exists) {
-        tx.update(ref, next);
-      } else {
-        tx.set(next);
-      }
+    // ----- Prepare updated map -----
+    final next = cur.toMap()
+      ..['currentStreak'] = streak
+      ..['highestStreak'] = best
+      ..['lastActiveDate'] = today.toIso8601String();
 
-      _checkAndUnlockStreakBadges(tx, ref, streak);
-      _addXPInTx(tx, ref, 10); // +10 XP for daily open
+    // ----- NEW: Reset daily counters if a new day -----
+    final lastWordXPDateStr = snap.data()?['lastWordXPDate'] as String?;
+    final lastWordXPDate = lastWordXPDateStr != null ? DateTime.tryParse(lastWordXPDateStr) : null;
+    final isNewDay = lastWordXPDate == null ||
+        lastWordXPDate.year != today.year ||
+        lastWordXPDate.month != today.month ||
+        lastWordXPDate.day != today.day;
 
-      final hour = now.hour;
-      if (hour < 7) _addBadgeInTx(tx, ref, bEarlyBird);
-      if (hour >= 23) _addBadgeInTx(tx, ref, bNightOwl);
+    if (isNewDay) {
+      next['wordsToday'] = 0;
+      next['lastWordXPDate'] = today.toIso8601String();
+    }
 
-      if (today.weekday == DateTime.saturday) {
-        _addBadgeInTx(tx, ref, 'wknd_sat');
-      } else if (today.weekday == DateTime.sunday) {
-        _addBadgeInTx(tx, ref, 'wknd_sun');
-      }
-      _tryUnlockWeekendWarrior(tx, ref);
+    // ----- Commit changes -----
+    if (snap.exists) {
+      tx.update(ref, next);
+    } else {
+      tx.set(ref, next);
+    }
 
-      return StreakFB.fromMap(next);
-    });
-  }
+    // ----- Award daily XP and streak badges -----
+    _checkAndUnlockStreakBadges(tx, ref, streak);
+    _addXPInTx(tx, ref, 10); // +10 XP for daily open
+
+    // ----- Time-of-day and weekend badges -----
+    final hour = now.hour;
+    if (hour < 7) _addBadgeInTx(tx, ref, bEarlyBird);
+    if (hour >= 23) _addBadgeInTx(tx, ref, bNightOwl);
+
+    if (today.weekday == DateTime.saturday) {
+      _addBadgeInTx(tx, ref, 'wknd_sat');
+    } else if (today.weekday == DateTime.sunday) {
+      _addBadgeInTx(tx, ref, 'wknd_sun');
+    }
+    _tryUnlockWeekendWarrior(tx, ref);
+
+    return StreakFB.fromMap(next);
+  });
+}
 
   // ---------- WORD VIEW TRACKING (with XP CAP) ----------
 
-  Future<void> trackWordViewed() async {
+    /// Track a slang view; unlock usage badges and grant XP (unique 10/day cap).
+  Future<void> trackWordViewed(String term) async {
     final ref = _doc();
     await _db.runTransaction((tx) async {
       final snap = await tx.get(ref);
       final cur = StreakFB.fromMap(snap.data());
-      final count = cur.wordsViewed + 1;
+      final now = DateTime.now();
+      final todayIso = DateTime(now.year, now.month, now.day).toIso8601String();
 
-      tx.update(ref, {'wordsViewed': count});
-
-      // Daily XP cap (max 10 slang views/day)
-      final today = DateTime.now();
-      final lastXPDateStr = snap.data()?['lastWordXPDate'] as String?;
+      // Get XP fields
+      final data = snap.data() ?? {};
+      final lastXPDateStr = data['lastWordXPDate'] as String?;
       final lastXPDate = lastXPDateStr != null ? DateTime.tryParse(lastXPDateStr) : null;
-      int wordsToday = (snap.data()?['wordsToday'] ?? 0) as int;
+      final newDay = lastXPDate == null || _justDate(lastXPDate) != _justDate(now);
 
-      final todayIso = DateTime(today.year, today.month, today.day).toIso8601String();
-      final newDay = lastXPDate == null ||
-          _justDate(lastXPDate) != _justDate(today);
+      // Reset daily tracking if new day
+      List viewedToday = newDay ? [] : (data['viewedTodayTerms'] as List? ?? []);
+      int wordsToday = newDay ? 0 : (data['wordsToday'] ?? 0) as int;
 
-      if (newDay) wordsToday = 0;
-
-      if (wordsToday < 10) {
-        wordsToday += 1;
-        tx.update(ref, {
-          'wordsToday': wordsToday,
-          'lastWordXPDate': todayIso,
-        });
-        _addXPInTx(tx, ref, 2); // +2 XP per word (capped at 10/day)
+      // If already viewed today → no XP
+      if (viewedToday.contains(term.toLowerCase())) {
+        // Just increment total views for analytics
+        tx.update(ref, {'wordsViewed': cur.wordsViewed + 1});
+        return;
       }
 
-      // Badge unlocks
-      if (count >= 1) _addBadgeInTx(tx, ref, bFirstWord);
-      if (count >= 10) _addBadgeInTx(tx, ref, bWords10);
-      if (count >= 50) _addBadgeInTx(tx, ref, bWords50);
-      if (count >= 100) _addBadgeInTx(tx, ref, bWords100);
-      if (count >= 250) _addBadgeInTx(tx, ref, bWords250);
-      if (count >= 500) _addBadgeInTx(tx, ref, bWords500);
+      // Add this term to today's list
+      viewedToday.add(term.toLowerCase());
+      wordsToday += 1;
+
+      // Update core stats
+      final newTotal = cur.wordsViewed + 1;
+      final updateData = {
+        'wordsViewed': newTotal,
+        'lastWordXPDate': todayIso,
+        'viewedTodayTerms': viewedToday,
+        'wordsToday': wordsToday,
+      };
+      tx.update(ref, updateData);
+
+      // ✅ XP logic (cap 10/day)
+      if (wordsToday <= 10) {
+        _addXPInTx(tx, ref, 2); // +2 XP per unique slang/day
+      }
+
+      // ✅ Badge unlocks
+      if (newTotal >= 1) _addBadgeInTx(tx, ref, bFirstWord);
+      if (newTotal >= 10) _addBadgeInTx(tx, ref, bWords10);
+      if (newTotal >= 50) _addBadgeInTx(tx, ref, bWords50);
+      if (newTotal >= 100) _addBadgeInTx(tx, ref, bWords100);
+      if (newTotal >= 250) _addBadgeInTx(tx, ref, bWords250);
+      if (newTotal >= 500) _addBadgeInTx(tx, ref, bWords500);
     });
   }
 
@@ -275,6 +327,14 @@ class StreakServiceFirebase {
       if (count >= 5) _addBadgeInTx(tx, ref, bShared5);
       if (count >= 25) _addBadgeInTx(tx, ref, bShared25);
       if (count >= 50) _addBadgeInTx(tx, ref, bShared50);
+    });
+  }
+
+  // ✅ Award XP for each correct quiz answer
+  Future<void> trackQuizXP() async {
+    final ref = _doc();
+    await _db.runTransaction((tx) async {
+      _addXPInTx(tx, ref, 1); // +1 XP per correct answer
     });
   }
 
@@ -343,20 +403,30 @@ class StreakServiceFirebase {
     });
   }
 
-  // ---------- STREAM ----------
-  Stream<StreakFB> watch() =>
-      _doc().snapshots().map((s) => StreakFB.fromMap(s.data()));
 
-  // ---------- DEBUG ----------
-  Future<void> debugResetAll() async {
-    await _doc().set(StreakFB.initial().toMap());
-  }
-
+  // ---------- DEBUG HELPERS ----------
   Future<void> debugAddBadge(String id) async {
-    await _doc().update({'badgesUnlocked': FieldValue.arrayUnion([id])});
+    final ref = _doc();
+    await ref.update({
+      'badgesUnlocked': FieldValue.arrayUnion([id]),
+    });
   }
 
   Future<void> debugRemoveBadge(String id) async {
-    await _doc().update({'badgesUnlocked': FieldValue.arrayRemove([id])});
+    final ref = _doc();
+    await ref.update({
+      'badgesUnlocked': FieldValue.arrayRemove([id]),
+    });
   }
-}
+
+  Future<void> debugResetAll() async {
+    final ref = _doc();
+    await ref.set(StreakFB.initial().toMap());
+  }
+
+  // ---------- STREAM WATCHER ----------
+  Stream<StreakFB> watch() =>
+      _doc().snapshots().map((s) => StreakFB.fromMap(s.data()));
+} // 👈 only ONE final brace at the very end
+  
+
