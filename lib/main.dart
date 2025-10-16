@@ -51,5 +51,5 @@ Future<void> main() async {
   });
 
   // ✅ Finally run app
-  runApp(const ProviderScope(child: GenZApp()));
+  runApp(const ProviderScope(child: MyApp())); // ✅ your current class name
 }

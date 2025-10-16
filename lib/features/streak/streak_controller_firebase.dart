@@ -41,7 +41,10 @@ class StreakFBController extends StateNotifier<StreakFB> {
     if (state.rewardsClaimed.contains(day)) return;
     await service.claim(day);
   }
-
+  Future<void> debugAddXP(int amount) async {
+  await service.debugAddXP(amount);
+  }
+  
   Future<void> trackWordViewed(String term) => service.trackWordViewed(term);
   Future<void> trackShared() => service.trackShared();
   Future<void> trackQuizXP() => service.trackQuizXP();

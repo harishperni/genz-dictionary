@@ -1,66 +1,81 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-ThemeData buildTheme() {
-  final base = ThemeData(
-    brightness: Brightness.dark,
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: const Color(0xFF7C4DFF), // neon purple
+/// ---------- App Theme (Material 3, dark neon) ----------
+class AppTheme {
+  AppTheme._();
+
+  static ThemeData dark() {
+    final seed = const Color(0xFF7C3AED); // neon purple
+    final scheme = ColorScheme.fromSeed(
+      seedColor: seed,
       brightness: Brightness.dark,
-    ),
-    useMaterial3: true,
-  );
+    );
 
-  return base.copyWith(
-    textTheme: GoogleFonts.soraTextTheme(base.textTheme).apply(
-      bodyColor: Colors.white,
-      displayColor: Colors.white,
-    ),
-    scaffoldBackgroundColor: const Color(0xFF0B0B11),
-
-    // 🔧 Flutter 3.22+ wants CardThemeData here
-    cardTheme: CardThemeData(
-      color: Colors.white.withOpacity(0.06),
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    ),
-
-    appBarTheme: const AppBarTheme(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      centerTitle: true,
-    ),
-    inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: Colors.white.withOpacity(0.06),
-      hintStyle: const TextStyle(color: Colors.white70),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide.none,
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: const Color(0xFF0D1021),
+      appBarTheme: AppBarTheme(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        titleTextStyle: const TextStyle(
+          fontWeight: FontWeight.w800,
+          fontSize: 20,
+          color: Colors.white,
+        ),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
+      textTheme: const TextTheme(
+        bodyMedium: TextStyle(color: Colors.white),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.08),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),
+        ),
+      ),
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: Color(0xFF7C3AED),
+        foregroundColor: Colors.white,
+      ),
+    );
+  }
+}
+
+/// ---------- Reusable background & card helpers ----------
+
+/// Neon gradient background for top-level containers.
+/// Usage: `decoration: neonGradientBackground(),`
+BoxDecoration neonGradientBackground() {
+  return const BoxDecoration(
+    gradient: LinearGradient(
+      colors: [Color(0xFF0D1021), Color(0xFF1F1147)],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
     ),
   );
 }
 
-BoxDecoration neonGradientBackground() => const BoxDecoration(
-  gradient: LinearGradient(
-    colors: [Color(0xFF0B0B11), Color(0xFF12122A)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  ),
-);
-
-BoxDecoration glassCard() => BoxDecoration(
-  color: Colors.white.withOpacity(0.06),
-  borderRadius: BorderRadius.circular(20),
-  border: Border.all(color: Colors.white.withOpacity(0.08)),
-  boxShadow: [
-    BoxShadow(
-      color: const Color(0xFF7C4DFF).withOpacity(0.25),
-      blurRadius: 20,
-      offset: const Offset(0, 8),
-    )
-  ],
-);
+/// Glassy card look used across the app.
+/// Usage: `decoration: glassCard(),`
+BoxDecoration glassCard() {
+  return BoxDecoration(
+    color: Colors.white.withOpacity(0.06),
+    borderRadius: BorderRadius.circular(16),
+    border: Border.all(color: Colors.white.withOpacity(0.12)),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withOpacity(0.25),
+        blurRadius: 12,
+        offset: const Offset(0, 6),
+      ),
+    ],
+  );
+}

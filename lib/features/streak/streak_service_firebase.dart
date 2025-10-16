@@ -256,60 +256,69 @@ Future<StreakFB> touchToday() async {
 
   // ---------- WORD VIEW TRACKING (with XP CAP) ----------
 
-    /// Track a slang view; unlock usage badges and grant XP (unique 10/day cap).
-  Future<void> trackWordViewed(String term) async {
-    final ref = _doc();
-    await _db.runTransaction((tx) async {
-      final snap = await tx.get(ref);
-      final cur = StreakFB.fromMap(snap.data());
-      final now = DateTime.now();
-      final todayIso = DateTime(now.year, now.month, now.day).toIso8601String();
+  /// Track a slang view; unlock usage badges and grant XP (unique 5/day cap).
+Future<void> trackWordViewed(String term) async {
+  final ref = _doc();
+  await _db.runTransaction((tx) async {
+    final snap = await tx.get(ref);
+    final cur = StreakFB.fromMap(snap.data());
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final todayIso = today.toIso8601String();
 
-      // Get XP fields
-      final data = snap.data() ?? {};
-      final lastXPDateStr = data['lastWordXPDate'] as String?;
-      final lastXPDate = lastXPDateStr != null ? DateTime.tryParse(lastXPDateStr) : null;
-      final newDay = lastXPDate == null || _justDate(lastXPDate) != _justDate(now);
+    // Get XP fields
+    final data = snap.data() ?? {};
+    final lastXPDateStr = data['lastWordXPDate'] as String?;
+    final lastXPDate = lastXPDateStr != null ? DateTime.tryParse(lastXPDateStr) : null;
 
-      // Reset daily tracking if new day
-      List viewedToday = newDay ? [] : (data['viewedTodayTerms'] as List? ?? []);
-      int wordsToday = newDay ? 0 : (data['wordsToday'] ?? 0) as int;
+    // ✅ Compare only by date, not full timestamps
+    bool newDay = false;
+    if (lastXPDate == null) {
+      newDay = true;
+    } else {
+      final lastDate = DateTime(lastXPDate.year, lastXPDate.month, lastXPDate.day);
+      newDay = today.difference(lastDate).inDays >= 1;
+    }
 
-      // If already viewed today → no XP
-      if (viewedToday.contains(term.toLowerCase())) {
-        // Just increment total views for analytics
-        tx.update(ref, {'wordsViewed': cur.wordsViewed + 1});
-        return;
-      }
+    // Reset daily tracking if new day
+    List viewedToday = newDay ? [] : (data['viewedTodayTerms'] as List? ?? []);
+    int wordsToday = newDay ? 0 : (data['wordsToday'] ?? 0) as int;
 
-      // Add this term to today's list
-      viewedToday.add(term.toLowerCase());
-      wordsToday += 1;
+    // If already viewed today → no XP
+    if (viewedToday.contains(term.toLowerCase())) {
+      // Just increment total views for analytics
+      tx.update(ref, {'wordsViewed': cur.wordsViewed + 1});
+      return;
+    }
 
-      // Update core stats
-      final newTotal = cur.wordsViewed + 1;
-      final updateData = {
-        'wordsViewed': newTotal,
-        'lastWordXPDate': todayIso,
-        'viewedTodayTerms': viewedToday,
-        'wordsToday': wordsToday,
-      };
-      tx.update(ref, updateData);
+    // Add this term to today's list
+    viewedToday.add(term.toLowerCase());
+    wordsToday += 1;
 
-      // ✅ XP logic (cap 10/day)
-      if (wordsToday <= 10) {
-        _addXPInTx(tx, ref, 2); // +2 XP per unique slang/day
-      }
+    // Update core stats
+    final newTotal = cur.wordsViewed + 1;
+    final updateData = {
+      'wordsViewed': newTotal,
+      'lastWordXPDate': todayIso,
+      'viewedTodayTerms': viewedToday,
+      'wordsToday': wordsToday,
+    };
+    tx.update(ref, updateData);
 
-      // ✅ Badge unlocks
-      if (newTotal >= 1) _addBadgeInTx(tx, ref, bFirstWord);
-      if (newTotal >= 10) _addBadgeInTx(tx, ref, bWords10);
-      if (newTotal >= 50) _addBadgeInTx(tx, ref, bWords50);
-      if (newTotal >= 100) _addBadgeInTx(tx, ref, bWords100);
-      if (newTotal >= 250) _addBadgeInTx(tx, ref, bWords250);
-      if (newTotal >= 500) _addBadgeInTx(tx, ref, bWords500);
-    });
-  }
+    // ✅ XP logic (cap 5/day)
+    if (wordsToday <= 5) {
+      _addXPInTx(tx, ref, 2); // +2 XP per unique slang/day
+    }
+
+    // ✅ Badge unlocks
+    if (newTotal >= 1) _addBadgeInTx(tx, ref, bFirstWord);
+    if (newTotal >= 10) _addBadgeInTx(tx, ref, bWords10);
+    if (newTotal >= 50) _addBadgeInTx(tx, ref, bWords50);
+    if (newTotal >= 100) _addBadgeInTx(tx, ref, bWords100);
+    if (newTotal >= 250) _addBadgeInTx(tx, ref, bWords250);
+    if (newTotal >= 500) _addBadgeInTx(tx, ref, bWords500);
+  });
+}
 
   // ---------- SHARE TRACKING ----------
 
@@ -427,6 +436,18 @@ Future<StreakFB> touchToday() async {
   // ---------- STREAM WATCHER ----------
   Stream<StreakFB> watch() =>
       _doc().snapshots().map((s) => StreakFB.fromMap(s.data()));
+
+  // ---------- DEBUG XP ----------
+Future<void> debugAddXP(int amount) async {
+  final ref = _doc();
+  await _db.runTransaction((tx) async {
+    final snap = await tx.get(ref);
+    final data = StreakFB.fromMap(snap.data());
+    final newXP = (data.xp ?? 0) + amount;
+    tx.update(ref, {'xp': newXP});
+  });
+}
 } // 👈 only ONE final brace at the very end
+
   
 

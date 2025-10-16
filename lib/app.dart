@@ -1,20 +1,37 @@
-// lib/app.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
-import 'features/streak/debug_streak_panel.dart';
 
-// Screens
+// 🏠 Core feature imports
 import 'features/slang/ui/search_page.dart';
 import 'features/slang/ui/detail_page.dart';
 import 'features/slang/ui/favorites_page.dart';
 import 'features/slang/ui/quiz_page.dart';
-import 'features/streak/badges_page.dart';
 
-/// Same routes you had working before
-GoRouter buildRouter() => GoRouter(
+// 🏅 Streaks & Badges
+import 'features/streak/badges_page.dart';
+import 'features/streak/streak_banner.dart';
+
+// ⚔️ Battle Mode (Phase 1)
+import 'features/battle/battle_menu_page.dart';
+import 'features/battle/create_lobby_page.dart';
+import 'features/battle/join_lobby_page.dart';
+
+// 🎨 Theme
+import 'theme/app_theme.dart';
+
+// 🧪 Debug
+import 'features/streak/debug_streak_panel.dart';
+
+class MyApp extends ConsumerWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = GoRouter(
       initialLocation: '/',
       routes: [
+        /// 🏠 HOME
         GoRoute(
           path: '/',
           name: 'home',
@@ -24,8 +41,7 @@ GoRouter buildRouter() => GoRouter(
               path: 'detail/:term',
               name: 'detail',
               builder: (context, state) {
-                final raw = state.pathParameters['term']!;
-                final term = Uri.decodeComponent(raw);
+                final term = Uri.decodeComponent(state.pathParameters['term']!);
                 return DetailPage(term: term);
               },
             ),
@@ -44,36 +60,40 @@ GoRouter buildRouter() => GoRouter(
               name: 'badges',
               builder: (context, state) => const BadgesPage(),
             ),
-            if (kDebugMode)
             GoRoute(
-              path: 'debug-streak',
-              name: 'debug-streak',
-              builder: (context, state) => const DebugStreakPanel(),
+              path: 'battle',
+              name: 'battle_menu',
+              builder: (context, state) => const BattleMenuPage(),
+              routes: [
+                GoRoute(
+                  path: 'create',
+                  name: 'create_lobby',
+                  builder: (context, state) => const CreateLobbyPage(),
+                ),
+                GoRoute(
+                  path: 'join',
+                  name: 'join_lobby',
+                  builder: (context, state) => const JoinLobbyPage(),
+                ),
+              ],
             ),
           ],
+        ),
+
+        /// 🧪 DEBUG STREAK PANEL (move it here!)
+        GoRoute(
+          path: '/debug-streak',
+          name: 'debug_streak',
+          builder: (_, __) => const DebugStreakPanel(),
         ),
       ],
     );
 
-class GenZApp extends StatelessWidget {
-  const GenZApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final router = buildRouter();
-
     return MaterialApp.router(
-      debugShowCheckedModeBanner: false,
       title: 'Gen Z Dictionary',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.dark(),
       routerConfig: router,
-      // Keep theme consistent (fixes brightness assertion)
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF7C3AED),
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
     );
   }
 }
