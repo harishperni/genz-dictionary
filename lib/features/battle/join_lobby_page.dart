@@ -1,7 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'battle_lobby_service.dart';
 import 'battle_lobby_model.dart';
@@ -16,42 +17,66 @@ class JoinLobbyPage extends ConsumerStatefulWidget {
 class _JoinLobbyPageState extends ConsumerState<JoinLobbyPage> {
   final TextEditingController _codeController = TextEditingController();
   final _service = BattleLobbyService();
+
   bool _joining = false;
   BattleLobby? _lobby;
-  Stream<BattleLobby?>? _lobbyStream;
+
+  StreamSubscription<BattleLobby?>? _sub;
+
+  // ✅ Put normalize helper INSIDE the State class
+  String _normalizeCode(String raw) {
+    return raw
+        .toUpperCase()
+        .replaceAll(RegExp(r'[^A-Z0-9]'), '') // removes spaces + anything weird
+        .trim();
+  }
 
   @override
   void dispose() {
+    _sub?.cancel();
     _codeController.dispose();
     super.dispose();
   }
 
   Future<void> _joinLobby() async {
-    final code = _codeController.text.trim().toUpperCase();
+    final raw = _codeController.text;
+    final code = _normalizeCode(raw);
+
+    // Keep textbox in sync (removes spaces instantly)
+    if (_codeController.text != code) {
+      _codeController.text = code;
+      _codeController.selection = TextSelection.fromPosition(
+        TextPosition(offset: code.length),
+      );
+    }
+
     if (code.isEmpty) return;
 
     setState(() => _joining = true);
 
     try {
       const userId = "demo_user_2"; // 🔧 Replace with Firebase Auth UID later
+
       final success = await _service.joinLobby(code, userId);
 
       if (!success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Lobby not found or already active.")),
+          const SnackBar(content: Text("Lobby not found or already full/active.")),
         );
         setState(() => _joining = false);
         return;
       }
 
-      // Start listening for real-time updates
-      _lobbyStream = _service.watchLobby(code);
-      _lobbyStream!.listen((lobby) {
-        if (!mounted || lobby == null) return;
+      // ✅ Cancel any previous listener before starting a new one
+      await _sub?.cancel();
+      _sub = _service.watchLobby(code).listen((lobby) {
+        if (!mounted) return;
         setState(() => _lobby = lobby);
 
-        // Auto-navigate to battle quiz once active
-        if (lobby.status == 'active') {
+        // (Phase 2 later) Auto-navigate once battle starts
+        if (lobby != null && lobby.status == 'active') {
+          // Only do this if you actually have a route named 'battle_quiz'
+          // Otherwise remove this block for Phase 1.
           context.pushNamed(
             'battle_quiz',
             pathParameters: {'code': code},
@@ -59,13 +84,17 @@ class _JoinLobbyPageState extends ConsumerState<JoinLobbyPage> {
         }
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Joined lobby #$code successfully!")),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Joined lobby #$code successfully!")),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error joining lobby: $e")),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error joining lobby: $e")),
+        );
+      }
     } finally {
       if (mounted) setState(() => _joining = false);
     }
@@ -96,6 +125,7 @@ class _JoinLobbyPageState extends ConsumerState<JoinLobbyPage> {
               ),
             ),
             const SizedBox(height: 20),
+
             TextField(
               controller: _codeController,
               textCapitalization: TextCapitalization.characters,
@@ -106,6 +136,15 @@ class _JoinLobbyPageState extends ConsumerState<JoinLobbyPage> {
                 color: Colors.white,
                 fontWeight: FontWeight.w800,
               ),
+              onChanged: (v) {
+                final fixed = _normalizeCode(v);
+                if (fixed != v) {
+                  _codeController.value = TextEditingValue(
+                    text: fixed,
+                    selection: TextSelection.collapsed(offset: fixed.length),
+                  );
+                }
+              },
               decoration: InputDecoration(
                 filled: true,
                 fillColor: Colors.white.withOpacity(0.08),
@@ -114,17 +153,17 @@ class _JoinLobbyPageState extends ConsumerState<JoinLobbyPage> {
                 counterText: '',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
-                  borderSide:
-                      BorderSide(color: Colors.white.withOpacity(0.15)),
+                  borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
-                  borderSide:
-                      const BorderSide(color: Color(0xFF7C3AED), width: 1.4),
+                  borderSide: const BorderSide(color: Color(0xFF7C3AED), width: 1.4),
                 ),
               ),
             ),
+
             const SizedBox(height: 20),
+
             _joining
                 ? const CircularProgressIndicator()
                 : ElevatedButton.icon(
@@ -140,6 +179,7 @@ class _JoinLobbyPageState extends ConsumerState<JoinLobbyPage> {
                     ),
                     onPressed: _joinLobby,
                   ),
+
             const SizedBox(height: 40),
 
             // 🔹 Show live lobby info

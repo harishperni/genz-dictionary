@@ -23,7 +23,7 @@ class BattleMenuPage extends StatelessWidget {
               ),
               icon: const Icon(Icons.add),
               label: const Text('Create Lobby', style: TextStyle(fontSize: 18)),
-              onPressed: () => context.pushNamed('createLobby'),
+              onPressed: () => context.pushNamed('create_lobby'),
             ),
             const SizedBox(height: 20),
             OutlinedButton.icon(
@@ -33,7 +33,7 @@ class BattleMenuPage extends StatelessWidget {
               ),
               icon: const Icon(Icons.login_rounded),
               label: const Text('Join Lobby', style: TextStyle(fontSize: 18)),
-              onPressed: () => context.pushNamed('joinLobby'),
+              onPressed: () => context.pushNamed('join_lobby'),
             ),
           ],
         ),
