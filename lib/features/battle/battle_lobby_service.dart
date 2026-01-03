@@ -1,3 +1,4 @@
+// lib/features/battle/battle_lobby_service.dart
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'battle_lobby_model.dart';
@@ -9,7 +10,6 @@ class BattleLobbyService {
   DocumentReference<Map<String, dynamic>> _ref(String code) =>
       _db.collection(_collection).doc(code);
 
-  /// Normalize any user-entered lobby code
   String normalizeCode(String raw) {
     return raw
         .toUpperCase()
@@ -18,14 +18,11 @@ class BattleLobbyService {
   }
 
   String _newCode() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no O/0/I/1
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     final r = Random.secure();
     return List.generate(6, (_) => chars[r.nextInt(chars.length)]).join();
   }
 
-  // ------------------------------------------------------------
-  // PHASE 1 — CREATE LOBBY
-  // ------------------------------------------------------------
   Future<String> createLobby({
     required String userId,
     required List<String> questions,
@@ -37,7 +34,8 @@ class BattleLobbyService {
       final code = _newCode();
       final ref = _ref(code);
 
-      if ((await ref.get()).exists) continue;
+      final snap = await ref.get();
+      if (snap.exists) continue;
 
       await ref.set({
         'hostId': userId,
@@ -49,10 +47,10 @@ class BattleLobbyService {
         'createdAt': FieldValue.serverTimestamp(),
         'startedAt': null,
 
-        // Phase 2 storage
-        'answers': {},
-        'locked': {},
-        'options': {}, // populated when battle starts
+        // ✅ Phase 2 data
+        'options': {}, // "0": ["A","B","C","D"]
+        'answers': {}, // "0": { uid: {selected, correct, at} }
+        'locked': {},  // "0": true
       });
 
       return code;
@@ -61,9 +59,6 @@ class BattleLobbyService {
     throw Exception('Failed to create unique lobby code.');
   }
 
-  // ------------------------------------------------------------
-  // PHASE 1 — JOIN LOBBY
-  // ------------------------------------------------------------
   Future<bool> joinLobby(String rawCode, String userId) async {
     final code = normalizeCode(rawCode);
     if (code.isEmpty) return false;
@@ -74,15 +69,17 @@ class BattleLobbyService {
       final snap = await tx.get(ref);
       if (!snap.exists) return false;
 
-      final data = snap.data()!;
-      final status = data['status'] as String;
+      final data = snap.data() ?? {};
+      final status = (data['status'] ?? 'waiting') as String;
+      final hostId = (data['hostId'] ?? '') as String;
       final guestId = data['guestId'] as String?;
-      final hostId = data['hostId'] as String;
 
       if (status == 'started' || status == 'finished') return false;
+
+      // safe join
       if (guestId != null && guestId != userId) return false;
 
-      final scores = Map<String, dynamic>.from(data['scores'] ?? {});
+      final scores = Map<String, dynamic>.from((data['scores'] as Map?) ?? {});
       scores.putIfAbsent(hostId, () => 0);
       scores.putIfAbsent(userId, () => 0);
 
@@ -96,58 +93,82 @@ class BattleLobbyService {
     });
   }
 
-  // ------------------------------------------------------------
-  // PHASE 2 — START BATTLE (FIXED OPTIONS ORDER)
-  // ------------------------------------------------------------
   Future<void> startBattle(String rawCode) async {
     final code = normalizeCode(rawCode);
+    if (code.isEmpty) throw Exception('Invalid lobby code.');
+
     final ref = _ref(code);
 
     await _db.runTransaction((tx) async {
       final snap = await tx.get(ref);
-      if (!snap.exists) throw Exception('Lobby not found');
+      if (!snap.exists) throw Exception('Lobby not found.');
 
-      final data = snap.data()!;
-      final status = data['status'] as String;
-      final hostId = data['hostId'] as String;
+      final data = snap.data() ?? {};
+      final status = (data['status'] ?? 'waiting') as String;
+      final hostId = (data['hostId'] ?? '') as String;
       final guestId = data['guestId'] as String?;
-      final questions = (data['questions'] as List).cast<String>();
+      final questions = (data['questions'] as List? ?? const []);
 
-      if (status != 'active') {
-        throw Exception('Lobby not ready');
-      }
-      if (guestId == null || guestId.isEmpty) {
-        throw Exception('Guest not joined');
-      }
-
-      // ✅ BUILD FIXED OPTIONS ONCE
-      final Map<String, List<String>> options = {};
-
-      for (int i = 0; i < questions.length; i++) {
-        // TEMP simple version (Phase 3 improves this)
-        final opts = List<String>.filled(4, questions[i]);
-        opts.shuffle();
-        options['$i'] = opts;
-      }
+      if (status != 'active') throw Exception('Lobby not ready. Waiting for guest.');
+      if (guestId == null || guestId.isEmpty) throw Exception('No guest joined yet.');
+      if (questions.isEmpty) throw Exception('No questions.');
 
       tx.update(ref, {
         'status': 'started',
         'startedAt': FieldValue.serverTimestamp(),
         'currentIndex': 0,
-        'scores': {
-          hostId: 0,
-          guestId: 0,
-        },
+        'scores': {hostId: 0, guestId: 0},
         'answers': {},
         'locked': {},
-        'options': options, // 🔒 ORDER IS NOW LOCKED
+        // options stays (generated as needed)
       });
     });
   }
 
-  // ------------------------------------------------------------
-  // PHASE 2 — SUBMIT ANSWER
-  // ------------------------------------------------------------
+  Future<void> advanceQuestion(String rawCode) async {
+    final code = normalizeCode(rawCode);
+    final ref = _ref(code);
+
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) throw Exception('Lobby not found.');
+
+      final data = snap.data() ?? {};
+      final status = (data['status'] ?? 'waiting') as String;
+      final questions = (data['questions'] as List? ?? []);
+      final idx = (data['currentIndex'] ?? 0) as int;
+
+      if (status != 'started') return;
+
+      final next = idx + 1;
+      if (next >= questions.length) {
+        tx.update(ref, {'status': 'finished'});
+      } else {
+        tx.update(ref, {'currentIndex': next});
+      }
+    });
+  }
+
+  /// ✅ Freeze options once (host should call this when missing)
+  Future<void> setOptionsIfMissing({
+    required String rawCode,
+    required int index,
+    required List<String> options,
+  }) async {
+    final code = normalizeCode(rawCode);
+    final ref = _ref(code);
+
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+      final data = snap.data() ?? {};
+      final map = Map<String, dynamic>.from((data['options'] as Map?) ?? {});
+      if (map.containsKey('$index')) return; // already frozen
+      map['$index'] = options;
+      tx.update(ref, {'options': map});
+    });
+  }
+
   Future<void> submitAnswer({
     required String rawCode,
     required String userId,
@@ -160,38 +181,44 @@ class BattleLobbyService {
 
     await _db.runTransaction((tx) async {
       final snap = await tx.get(ref);
-      if (!snap.exists) return;
+      if (!snap.exists) throw Exception('Lobby not found');
 
-      final data = snap.data()!;
-      if (data['status'] != 'started') return;
+      final data = snap.data() ?? {};
+      final status = (data['status'] ?? 'waiting') as String;
+      if (status != 'started') return;
 
-      final answers = Map<String, dynamic>.from(data['answers'] ?? {});
-      final locked = Map<String, dynamic>.from(data['locked'] ?? {});
-      final scores = Map<String, dynamic>.from(data['scores'] ?? {});
-      final hostId = data['hostId'] as String;
-      final guestId = data['guestId'] as String;
+      final hostId = (data['hostId'] ?? '') as String;
+      final guestId = (data['guestId'] ?? '') as String;
 
+      final answers = Map<String, dynamic>.from((data['answers'] as Map?) ?? {});
+      final locked = Map<String, dynamic>.from((data['locked'] as Map?) ?? {});
       if (locked['$index'] == true) return;
 
-      final perIndex =
-          Map<String, dynamic>.from(answers['$index'] ?? {});
-      if (perIndex.containsKey(userId)) return;
+      final existingForIndex =
+          Map<String, dynamic>.from((answers['$index'] as Map?) ?? {});
+      final alreadyAnswered = existingForIndex.containsKey(userId);
 
-      perIndex[userId] = {
+      existingForIndex[userId] = {
         'selected': selected,
         'correct': correct,
         'at': FieldValue.serverTimestamp(),
       };
-      answers['$index'] = perIndex;
+      answers['$index'] = existingForIndex;
 
-      if (correct) {
-        scores[userId] = (scores[userId] ?? 0) + 1;
+      final scores = Map<String, dynamic>.from((data['scores'] as Map?) ?? {});
+      scores.putIfAbsent(hostId, () => 0);
+      if (guestId.isNotEmpty) scores.putIfAbsent(guestId, () => 0);
+
+      if (!alreadyAnswered && correct == true) {
+        scores[userId] = ((scores[userId] ?? 0) as int) + 1;
       }
 
-      if (perIndex.containsKey(hostId) &&
-          perIndex.containsKey(guestId)) {
-        locked['$index'] = true;
-      }
+      final bothAnswered = hostId.isNotEmpty &&
+          guestId.isNotEmpty &&
+          existingForIndex.containsKey(hostId) &&
+          existingForIndex.containsKey(guestId);
+
+      if (bothAnswered) locked['$index'] = true;
 
       tx.update(ref, {
         'answers': answers,
@@ -201,34 +228,6 @@ class BattleLobbyService {
     });
   }
 
-  // ------------------------------------------------------------
-  // PHASE 2 — ADVANCE QUESTION (HOST ONLY)
-  // ------------------------------------------------------------
-  Future<void> advanceQuestion(String rawCode) async {
-    final code = normalizeCode(rawCode);
-    final ref = _ref(code);
-
-    await _db.runTransaction((tx) async {
-      final snap = await tx.get(ref);
-      if (!snap.exists) return;
-
-      final data = snap.data()!;
-      if (data['status'] != 'started') return;
-
-      final idx = data['currentIndex'] as int;
-      final total = (data['questions'] as List).length;
-
-      if (idx + 1 >= total) {
-        tx.update(ref, {'status': 'finished'});
-      } else {
-        tx.update(ref, {'currentIndex': idx + 1});
-      }
-    });
-  }
-
-  // ------------------------------------------------------------
-  // REALTIME LISTENER
-  // ------------------------------------------------------------
   Stream<BattleLobby?> watchLobby(String rawCode) {
     final code = normalizeCode(rawCode);
     return _ref(code).snapshots().map((doc) {

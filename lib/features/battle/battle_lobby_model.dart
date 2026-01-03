@@ -1,3 +1,4 @@
+// lib/features/battle/battle_lobby_model.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class BattleLobby {
@@ -5,19 +6,17 @@ class BattleLobby {
   final String hostId;
   final String? guestId;
   final String status; // waiting | active | started | finished
-
   final List<String> questions;
   final int currentIndex;
 
-  /// ✅ Phase 2
-  /// options[index] = ordered list of options (stable for both players)
+  // ✅ Freeze options per question index: "0": ["A","B","C","D"]
   final Map<String, List<String>> options;
 
-  /// answers[index][uid] = { selected, correct, at }
+  // ✅ Answers map: index -> uid -> {selected, correct, at}
   final Map<String, dynamic> answers;
 
-  /// locked[index] = true
-  final Map<String, bool> locked;
+  // ✅ Locked map: index -> true
+  final Map<String, dynamic> locked;
 
   final Map<String, int> scores;
 
@@ -42,34 +41,43 @@ class BattleLobby {
   factory BattleLobby.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
 
-    Map<String, List<String>> _parseOptions() {
-      final raw = Map<String, dynamic>.from(data['options'] ?? {});
-      return raw.map(
-        (k, v) => MapEntry(k, List<String>.from(v as List)),
-      );
-    }
+    final qRaw = (data['questions'] as List?) ?? const [];
+    final questions = qRaw.map((e) => e.toString()).toList();
 
-    Map<String, int> _parseScores() {
-      final raw = Map<String, dynamic>.from(data['scores'] ?? {});
-      return raw.map(
-        (k, v) => MapEntry(k, (v as num).toInt()),
-      );
-    }
+    // options
+    final oRaw = (data['options'] as Map?) ?? const {};
+    final options = <String, List<String>>{};
+    oRaw.forEach((k, v) {
+      options[k.toString()] = (v as List).map((e) => e.toString()).toList();
+    });
 
-    DateTime? _ts(dynamic v) =>
-        v is Timestamp ? v.toDate() : null;
+    // answers/locked
+    final answers = Map<String, dynamic>.from((data['answers'] as Map?) ?? {});
+    final locked = Map<String, dynamic>.from((data['locked'] as Map?) ?? {});
+
+    // scores
+    final sRaw = (data['scores'] as Map?) ?? const {};
+    final scores = <String, int>{};
+    sRaw.forEach((k, v) {
+      scores[k.toString()] = (v is int) ? v : int.tryParse(v.toString()) ?? 0;
+    });
+
+    DateTime? _ts(dynamic v) {
+      if (v is Timestamp) return v.toDate();
+      return null;
+    }
 
     return BattleLobby(
       id: doc.id,
-      hostId: data['hostId'] ?? '',
-      guestId: data['guestId'],
-      status: data['status'] ?? 'waiting',
-      questions: List<String>.from(data['questions'] ?? []),
+      hostId: (data['hostId'] ?? '') as String,
+      guestId: data['guestId'] as String?,
+      status: (data['status'] ?? 'waiting') as String,
+      questions: questions,
       currentIndex: (data['currentIndex'] ?? 0) as int,
-      options: _parseOptions(),
-      answers: Map<String, dynamic>.from(data['answers'] ?? {}),
-      locked: Map<String, bool>.from(data['locked'] ?? {}),
-      scores: _parseScores(),
+      options: options,
+      answers: answers,
+      locked: locked,
+      scores: scores,
       createdAt: _ts(data['createdAt']),
       startedAt: _ts(data['startedAt']),
     );
