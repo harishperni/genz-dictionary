@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -20,6 +21,9 @@ class _CreateLobbyPageState extends ConsumerState<CreateLobbyPage> {
   StreamSubscription<BattleLobby?>? _sub;
 
   bool _creating = false;
+  bool _starting = false;
+  bool _navigated = false;
+
   String? _code;
   BattleLobby? _lobby;
 
@@ -32,6 +36,8 @@ class _CreateLobbyPageState extends ConsumerState<CreateLobbyPage> {
   Future<void> _createLobby() async {
     setState(() {
       _creating = true;
+      _starting = false;
+      _navigated = false;
       _code = null;
       _lobby = null;
     });
@@ -39,52 +45,90 @@ class _CreateLobbyPageState extends ConsumerState<CreateLobbyPage> {
     await Future.delayed(const Duration(milliseconds: 150)); // allow UI update
 
     try {
-      const userId = "demo_user_1"; // TODO: replace with Firebase Auth UID later
+      const userId = "demo_user_1"; // TODO replace with FirebaseAuth uid later
 
+      // ✅ Load slang list
       final slangList = await ref.read(slangListProvider.future);
       if (slangList.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No slang data found.')),
-          );
-        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No slang data found.')),
+        );
+        setState(() => _creating = false);
         return;
       }
 
-      // Take 10 random terms (shuffle first, then take)
-      final terms = slangList.map((e) => e.term).toList()..shuffle();
-      final questions = terms.take(10).toList();
+      // ✅ Pick questions (10)
+      final questions = slangList.map((e) => e.term).toList()..shuffle();
+      final chosen = questions.take(10).toList();
 
-      final code = await _service.createLobby(userId: userId, questions: questions);
+      // ✅ Create lobby
+      final code = await _service.createLobby(userId: userId, questions: chosen);
 
-      // Save code first (so UI shows QR immediately)
       if (!mounted) return;
       setState(() => _code = code);
 
-      // Cancel old listener if exists
+      // cancel old listener
       await _sub?.cancel();
 
-      // Listen for lobby updates
+      // ✅ Watch lobby updates
       _sub = _service.watchLobby(code).listen((lobby) {
         if (!mounted || lobby == null) return;
 
         setState(() => _lobby = lobby);
 
-        // OPTIONAL: If you later switch status to 'active' in Phase 2,
-        // you can auto-navigate here.
-        //
-        // if (lobby.guestId != null && lobby.status == 'active') {
-        //   context.pushNamed('battle_quiz', pathParameters: {'code': code});
-        // }
+        // ✅ Phase 2: navigate ONLY ONCE when started
+        if (!_navigated && lobby.status == 'started') {
+          _navigated = true;
+
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            context.goNamed(
+              'battle_quiz',
+              pathParameters: {'code': code},
+              extra: userId, // ✅ pass host userId via extra
+            );
+          });
+        }
       });
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error creating lobby: $e')),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error creating lobby: $e')),
+      );
     } finally {
       if (mounted) setState(() => _creating = false);
+    }
+  }
+
+  Future<void> _startBattle() async {
+    final code = _code;
+    final lobby = _lobby;
+    if (code == null || lobby == null) return;
+
+    // safety checks
+    if (lobby.guestId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No guest joined yet.')),
+      );
+      return;
+    }
+    if (_starting) return;
+
+    setState(() => _starting = true);
+
+    try {
+      const userId = "demo_user_1";
+      await _service.startBattle(code);
+
+      // navigation happens from stream when status becomes started
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error starting battle: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _starting = false);
     }
   }
 
@@ -92,6 +136,9 @@ class _CreateLobbyPageState extends ConsumerState<CreateLobbyPage> {
   Widget build(BuildContext context) {
     final code = _code;
     final lobby = _lobby;
+
+    final guestJoined = lobby?.guestId != null;
+    final canStart = guestJoined && lobby?.status == 'active';
 
     return Scaffold(
       appBar: AppBar(
@@ -101,29 +148,29 @@ class _CreateLobbyPageState extends ConsumerState<CreateLobbyPage> {
             IconButton(
               tooltip: 'Create new lobby',
               onPressed: _creating ? null : _createLobby,
-              icon: const Icon(Icons.refresh_rounded),
+              icon: const Icon(Icons.refresh),
             ),
         ],
       ),
       body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: _creating
-              ? const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 12),
-                    Text('Creating your lobby...'),
-                  ],
-                )
-              : code == null
-                  ? ElevatedButton.icon(
-                      onPressed: _createLobby,
-                      icon: const Icon(Icons.sports_kabaddi_rounded),
-                      label: const Text('Create Lobby'),
-                    )
-                  : Column(
+        child: _creating
+            ? const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 12),
+                  Text('Creating your lobby...'),
+                ],
+              )
+            : code == null
+                ? ElevatedButton.icon(
+                    onPressed: _createLobby,
+                    icon: const Icon(Icons.sports_kabaddi_rounded),
+                    label: const Text('Create Lobby'),
+                  )
+                : Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
@@ -134,56 +181,70 @@ class _CreateLobbyPageState extends ConsumerState<CreateLobbyPage> {
                           ),
                         ),
                         const SizedBox(height: 16),
+                        QrImageView(
+                          data: code,
+                          size: 220,
+                          backgroundColor: Colors.white,
+                        ),
+                        const SizedBox(height: 18),
 
-                        // QR
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          color: Colors.white,
-                          child: QrImageView(
-                            data: code,
-                            size: 220,
-                            backgroundColor: Colors.white,
+                        if (guestJoined)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(12),
+                              border:
+                                  Border.all(color: Colors.greenAccent),
+                            ),
+                            child: Text(
+                              '✅ Friend joined: ${lobby!.guestId}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                color: Colors.greenAccent,
+                              ),
+                            ),
+                          )
+                        else
+                          const Text('Waiting for a friend to join...'),
+
+                        const SizedBox(height: 18),
+
+                        // ✅ Start Battle button (Phase 2)
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: canStart ? _startBattle : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF7C3AED),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: _starting
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : Text(
+                                    guestJoined
+                                        ? 'Start Battle'
+                                        : 'Start Battle (need guest)',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
                           ),
                         ),
 
-                        const SizedBox(height: 20),
-
-                        // ✅ LIVE STATUS (this is what fixes your issue)
-                        if (lobby == null) ...[
-                          const Text('Loading lobby status...'),
-                          const SizedBox(height: 12),
-                          const CircularProgressIndicator(),
-                        ] else if (lobby.guestId == null) ...[
-                          const Text('Waiting for a friend to join...'),
-                          const SizedBox(height: 12),
-                          const CircularProgressIndicator(),
-                        ] else ...[
-                          Text(
-                            '✅ Friend joined: ${lobby.guestId}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              color: Colors.green,
-                              fontSize: 16,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          const Text('Phase 1 complete — lobby is ready.'),
-                          const SizedBox(height: 16),
-
-                          // Optional button for later (Phase 2 start)
-                          FilledButton(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Next: implement Battle Quiz start (Phase 2).'),
-                                ),
-                              );
-                            },
-                            child: const Text('Start Battle (coming next)'),
-                          ),
-                        ],
-
-                        const SizedBox(height: 18),
+                        const SizedBox(height: 8),
 
                         TextButton(
                           onPressed: () => context.pop(),
@@ -191,7 +252,7 @@ class _CreateLobbyPageState extends ConsumerState<CreateLobbyPage> {
                         ),
                       ],
                     ),
-        ),
+                  ),
       ),
     );
   }

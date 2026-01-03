@@ -16,20 +16,15 @@ class JoinLobbyPage extends ConsumerStatefulWidget {
 
 class _JoinLobbyPageState extends ConsumerState<JoinLobbyPage> {
   final TextEditingController _codeController = TextEditingController();
-  final _service = BattleLobbyService();
-
-  bool _joining = false;
-  BattleLobby? _lobby;
+  final BattleLobbyService _service = BattleLobbyService();
 
   StreamSubscription<BattleLobby?>? _sub;
 
-  // ✅ Put normalize helper INSIDE the State class
-  String _normalizeCode(String raw) {
-    return raw
-        .toUpperCase()
-        .replaceAll(RegExp(r'[^A-Z0-9]'), '') // removes spaces + anything weird
-        .trim();
-  }
+  bool _joining = false;
+  bool _navigated = false;
+
+  String? _code; // normalized code we joined
+  BattleLobby? _lobby;
 
   @override
   void dispose() {
@@ -38,63 +33,72 @@ class _JoinLobbyPageState extends ConsumerState<JoinLobbyPage> {
     super.dispose();
   }
 
+  String _normalizeCode(String raw) {
+    return raw
+        .toUpperCase()
+        .replaceAll(RegExp(r'[^A-Z0-9]'), '')
+        .trim();
+  }
+
   Future<void> _joinLobby() async {
-    final raw = _codeController.text;
-    final code = _normalizeCode(raw);
-
-    // Keep textbox in sync (removes spaces instantly)
-    if (_codeController.text != code) {
-      _codeController.text = code;
-      _codeController.selection = TextSelection.fromPosition(
-        TextPosition(offset: code.length),
-      );
-    }
-
+    final code = _normalizeCode(_codeController.text);
     if (code.isEmpty) return;
 
-    setState(() => _joining = true);
+    setState(() {
+      _joining = true;
+      _navigated = false;
+      _code = code;
+      _lobby = null;
+    });
 
     try {
-      const userId = "demo_user_2"; // 🔧 Replace with Firebase Auth UID later
+      const userId = "demo_user_2"; // TODO replace with FirebaseAuth uid later
 
+      // ✅ join lobby (safe join logic should be in service)
       final success = await _service.joinLobby(code, userId);
 
-      if (!success && mounted) {
+      if (!success) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Lobby not found or already full/active.")),
+          const SnackBar(content: Text("Lobby not found or already joined.")),
         );
         setState(() => _joining = false);
         return;
       }
 
-      // ✅ Cancel any previous listener before starting a new one
+      // cancel old listener
       await _sub?.cancel();
+
+      // ✅ watch realtime changes
       _sub = _service.watchLobby(code).listen((lobby) {
-        if (!mounted) return;
+        if (!mounted || lobby == null) return;
+
         setState(() => _lobby = lobby);
 
-        // (Phase 2 later) Auto-navigate once battle starts
-        if (lobby != null && lobby.status == 'active') {
-          // Only do this if you actually have a route named 'battle_quiz'
-          // Otherwise remove this block for Phase 1.
-          context.pushNamed(
-            'battle_quiz',
-            pathParameters: {'code': code},
-          );
+        // ✅ Phase 2: navigate ONLY ONCE when status becomes started
+        if (!_navigated && lobby.status == 'started') {
+          _navigated = true;
+
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            context.goNamed(
+              'battle_quiz',
+              pathParameters: {'code': code},
+              extra: userId, // ✅ pass guest userId via extra
+            );
+          });
         }
       });
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Joined lobby #$code successfully!")),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Joined lobby $code successfully!")),
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error joining lobby: $e")),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error joining lobby: $e")),
+      );
     } finally {
       if (mounted) setState(() => _joining = false);
     }
@@ -102,6 +106,8 @@ class _JoinLobbyPageState extends ConsumerState<JoinLobbyPage> {
 
   @override
   Widget build(BuildContext context) {
+    final code = _code;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Join Battle Lobby')),
       body: Container(
@@ -136,15 +142,6 @@ class _JoinLobbyPageState extends ConsumerState<JoinLobbyPage> {
                 color: Colors.white,
                 fontWeight: FontWeight.w800,
               ),
-              onChanged: (v) {
-                final fixed = _normalizeCode(v);
-                if (fixed != v) {
-                  _codeController.value = TextEditingValue(
-                    text: fixed,
-                    selection: TextSelection.collapsed(offset: fixed.length),
-                  );
-                }
-              },
               decoration: InputDecoration(
                 filled: true,
                 fillColor: Colors.white.withOpacity(0.08),
@@ -157,7 +154,8 @@ class _JoinLobbyPageState extends ConsumerState<JoinLobbyPage> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: Color(0xFF7C3AED), width: 1.4),
+                  borderSide:
+                      const BorderSide(color: Color(0xFF7C3AED), width: 1.4),
                 ),
               ),
             ),
@@ -182,10 +180,21 @@ class _JoinLobbyPageState extends ConsumerState<JoinLobbyPage> {
 
             const SizedBox(height: 40),
 
-            // 🔹 Show live lobby info
+            if (code != null)
+              Text(
+                'Lobby: $code',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.75),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+
+            const SizedBox(height: 12),
+
+            // 🔹 Live lobby info
             if (_lobby != null)
               AnimatedContainer(
-                duration: const Duration(milliseconds: 400),
+                duration: const Duration(milliseconds: 350),
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.05),
@@ -193,35 +202,31 @@ class _JoinLobbyPageState extends ConsumerState<JoinLobbyPage> {
                   border: Border.all(color: Colors.white24),
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      "Lobby: ${_lobby!.id}",
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
                     Text(
                       "Status: ${_lobby!.status}",
                       style: TextStyle(
-                        color: _lobby!.status == 'active'
+                        color: _lobby!.status == 'started'
                             ? Colors.greenAccent
-                            : Colors.amberAccent,
+                            : (_lobby!.status == 'active'
+                                ? Colors.amberAccent
+                                : Colors.white70),
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 10),
-                    Text(
-                      "Host: ${_lobby!.hostId}",
-                      style: const TextStyle(color: Colors.white70),
-                    ),
+                    Text("Host: ${_lobby!.hostId}",
+                        style: const TextStyle(color: Colors.white70)),
                     if (_lobby!.guestId != null)
+                      Text("Guest: ${_lobby!.guestId}",
+                          style: const TextStyle(color: Colors.white70)),
+                    const SizedBox(height: 10),
+                    if (_lobby!.status != 'started')
                       Text(
-                        "Guest: ${_lobby!.guestId}",
-                        style: const TextStyle(color: Colors.white70),
+                        'Waiting for host to start…',
+                        style: TextStyle(color: Colors.white.withOpacity(0.65)),
                       ),
                   ],
                 ),

@@ -4,70 +4,74 @@ class BattleLobby {
   final String id;
   final String hostId;
   final String? guestId;
+  final String status; // waiting | active | started | finished
+
   final List<String> questions;
-  final String status;
-  final DateTime createdAt;
+  final int currentIndex;
+
+  /// ✅ Phase 2
+  /// options[index] = ordered list of options (stable for both players)
+  final Map<String, List<String>> options;
+
+  /// answers[index][uid] = { selected, correct, at }
+  final Map<String, dynamic> answers;
+
+  /// locked[index] = true
+  final Map<String, bool> locked;
+
   final Map<String, int> scores;
+
+  final DateTime? createdAt;
+  final DateTime? startedAt;
 
   BattleLobby({
     required this.id,
     required this.hostId,
-    this.guestId,
-    required this.questions,
+    required this.guestId,
     required this.status,
+    required this.questions,
+    required this.currentIndex,
+    required this.options,
+    required this.answers,
+    required this.locked,
+    required this.scores,
     required this.createdAt,
-    this.scores = const {},
+    required this.startedAt,
   });
 
-  // Convert to Firestore map
-  Map<String, dynamic> toMap() {
-    return {
-      'hostId': hostId,
-      'guestId': guestId,
-      'questions': questions,
-      'status': status,
-      'createdAt': createdAt.toIso8601String(),
-      'scores': scores,
-    };
-  }
+  factory BattleLobby.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data() ?? {};
 
-  // Create object from Firestore map
-  factory BattleLobby.fromMap(Map<String, dynamic> data, String id) {
+    Map<String, List<String>> _parseOptions() {
+      final raw = Map<String, dynamic>.from(data['options'] ?? {});
+      return raw.map(
+        (k, v) => MapEntry(k, List<String>.from(v as List)),
+      );
+    }
+
+    Map<String, int> _parseScores() {
+      final raw = Map<String, dynamic>.from(data['scores'] ?? {});
+      return raw.map(
+        (k, v) => MapEntry(k, (v as num).toInt()),
+      );
+    }
+
+    DateTime? _ts(dynamic v) =>
+        v is Timestamp ? v.toDate() : null;
+
     return BattleLobby(
-      id: id,
+      id: doc.id,
       hostId: data['hostId'] ?? '',
       guestId: data['guestId'],
-      questions: List<String>.from(data['questions'] ?? []),
       status: data['status'] ?? 'waiting',
-      createdAt: DateTime.tryParse(data['createdAt'] ?? '') ?? DateTime.now(),
-      scores: Map<String, int>.from(data['scores'] ?? {}),
+      questions: List<String>.from(data['questions'] ?? []),
+      currentIndex: (data['currentIndex'] ?? 0) as int,
+      options: _parseOptions(),
+      answers: Map<String, dynamic>.from(data['answers'] ?? {}),
+      locked: Map<String, bool>.from(data['locked'] ?? {}),
+      scores: _parseScores(),
+      createdAt: _ts(data['createdAt']),
+      startedAt: _ts(data['startedAt']),
     );
-  }
-
-  // Optional: helper to rebuild with updates
-  BattleLobby copyWith({
-    String? id,
-    String? hostId,
-    String? guestId,
-    List<String>? questions,
-    String? status,
-    DateTime? createdAt,
-    Map<String, int>? scores,
-  }) {
-    return BattleLobby(
-      id: id ?? this.id,
-      hostId: hostId ?? this.hostId,
-      guestId: guestId ?? this.guestId,
-      questions: questions ?? this.questions,
-      status: status ?? this.status,
-      createdAt: createdAt ?? this.createdAt,
-      scores: scores ?? this.scores,
-    );
-  }
-
-  // Convenience Firestore doc converter
-  static BattleLobby fromDoc(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    return BattleLobby.fromMap(data, doc.id);
   }
 }

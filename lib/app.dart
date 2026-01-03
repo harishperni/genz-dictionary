@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'features/battle/battle_quiz_page.dart';
 
 // 🏠 Core feature imports
 import 'features/slang/ui/search_page.dart';
@@ -59,6 +60,15 @@ class MyApp extends ConsumerWidget {
               path: 'badges',
               name: 'badges',
               builder: (context, state) => const BadgesPage(),
+            ),
+            GoRoute(
+              path: 'quiz/:code',
+              name: 'battle_quiz',
+              builder: (context, state) {
+                final code = state.pathParameters['code']!;
+                final uid = (state.extra as String?) ?? 'demo_user_1'; // fallback for safety
+                return BattleQuizPage(code: code, userId: uid);
+              },
             ),
             GoRoute(
               path: 'battle',
