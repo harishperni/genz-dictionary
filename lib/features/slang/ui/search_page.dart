@@ -1,3 +1,5 @@
+// lib/features/slang/ui/search_page.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -22,21 +24,54 @@ class SearchPage extends ConsumerStatefulWidget {
 
 class _SearchPageState extends ConsumerState<SearchPage> {
   final TextEditingController _controller = TextEditingController();
+
+  // Raw text as user types
+  String _qRaw = '';
+
+  // Debounced query actually used to filter
   String _q = '';
-  final xpBarKey = GlobalKey<XPProgressBarState>();
+
+  Timer? _debounce;
+
+  // Cache: term -> precomputed searchable text (lowercased)
+  final Map<String, String> _hayCache = {};
+
+  // Key to trigger XP popup animation
+  final GlobalKey<XPProgressBarState> xpBarKey = GlobalKey<XPProgressBarState>();
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _controller.dispose();
     super.dispose();
+  }
+
+  void _onQueryChanged(String v) {
+    _qRaw = v;
+
+    // Debounce filtering to avoid UI lag while typing
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 180), () {
+      if (!mounted) return;
+      setState(() => _q = _qRaw);
+    });
   }
 
   List<SlangEntry> _filter(List<SlangEntry> all, String q) {
     final query = q.trim().toLowerCase();
     if (query.isEmpty) return all;
+
+    // Build haystack cache once per term (fast search later)
+    // NOTE: uses term as key; if you ever have duplicates, switch key to sys id.
+    for (final e in all) {
+      _hayCache.putIfAbsent(e.term, () {
+        return ('${e.term} ${e.meaning} ${e.example} ${e.tags.join(" ")}')
+            .toLowerCase();
+      });
+    }
+
     return all.where((e) {
-      final hay =
-          '${e.term} ${e.meaning} ${e.example} ${e.tags.join(" ")}'.toLowerCase();
+      final hay = _hayCache[e.term] ?? '';
       return hay.contains(query);
     }).toList();
   }
@@ -58,7 +93,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 🔹 XP Progress Bar with animation key
+              // 🔹 XP Progress Bar
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                 child: XPProgressBar(key: xpBarKey),
@@ -68,21 +103,19 @@ class _SearchPageState extends ConsumerState<SearchPage> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [
                         Color(0xFF5A2DF5),
                         Color(0xFF6B34F0),
-                        Color(0xFF7C3AED)
+                        Color(0xFF7C3AED),
                       ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(26),
-                    border:
-                        Border.all(color: Colors.white.withOpacity(0.10)),
+                    border: Border.all(color: Colors.white.withOpacity(0.10)),
                     boxShadow: [
                       BoxShadow(
                         color: const Color(0xFF7C3AED).withOpacity(0.25),
@@ -112,7 +145,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                       ),
                       _TopDivider(),
                       _TopQuickAction(
-                        icon: Icons.sports_kabaddi_rounded, // if unavailable, use Icons.sports_kabaddi
+                        icon: Icons.sports_kabaddi_rounded,
                         label: 'Battle',
                         routeName: 'battle_menu',
                       ),
@@ -130,16 +163,16 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                 child: sodAsync.when(
                   data: (e) => _SlangOfDayCard(entry: e),
                   loading: () => _glassShimmer(height: 88),
-                  error: (e, _) => const SizedBox.shrink(),
+                  error: (_, __) => const SizedBox.shrink(),
                 ),
               ),
 
-              // 🔎 Search Field
+              // 🔎 Search Field (debounced)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                 child: TextField(
                   controller: _controller,
-                  onChanged: (v) => setState(() => _q = v),
+                  onChanged: _onQueryChanged,
                   decoration: InputDecoration(
                     hintText: 'Search slang, meaning, tags…',
                     prefixIcon: const Icon(Icons.search),
@@ -147,16 +180,14 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                     fillColor: Colors.white.withOpacity(0.08),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide:
-                          BorderSide(color: Colors.white.withOpacity(0.15)),
+                      borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide:
-                          BorderSide(color: Colors.white.withOpacity(0.15)),
+                      borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   ),
                 ),
               ),
@@ -165,7 +196,14 @@ class _SearchPageState extends ConsumerState<SearchPage> {
               Expanded(
                 child: listAsync.when(
                   data: (all) {
+                    // Clear cache if dataset changed drastically (optional safety)
+                    // If you never mutate slangs at runtime, you can remove this.
+                    if (_hayCache.length > all.length + 50) {
+                      _hayCache.clear();
+                    }
+
                     final items = _filter(all, _q);
+
                     if (items.isEmpty) {
                       return Center(
                         child: Padding(
@@ -180,36 +218,30 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                         ),
                       );
                     }
+
                     return ListView.separated(
-                      padding:
-                          const EdgeInsets.fromLTRB(8, 0, 8, 96),
+                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 96),
                       itemCount: items.length,
-                      separatorBuilder: (_, __) =>
-                          const SizedBox(height: 8),
-                      itemBuilder: (context, i) {
-                        final e = items[i];
-                        return _SlangTile(entry: e);
-                      },
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (context, i) => _SlangTile(entry: items[i]),
                     );
                   },
                   loading: () => ListView.builder(
-                    padding:
-                        const EdgeInsets.fromLTRB(16, 0, 16, 96),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
                     itemCount: 10,
                     itemBuilder: (_, __) => Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: _glassShimmer(height: 64),
                     ),
                   ),
-                  error: (e, st) =>
-                      Center(child: Text('Error: $e')),
+                  error: (e, _) => Center(child: Text('Error: $e')),
                 ),
               ),
             ],
           ),
         ),
 
-        // 🧪 XP Debug Button (now triggers popup + animation)
+        // 🧪 XP Debug Button (popup animation)
         floatingActionButton: FloatingActionButton.extended(
           backgroundColor: Colors.deepPurpleAccent,
           icon: const Icon(Icons.add, color: Colors.white),
@@ -217,7 +249,6 @@ class _SearchPageState extends ConsumerState<SearchPage> {
           onPressed: () async {
             const addedXP = 50;
             final notifier = ref.read(streakFBProvider.notifier);
-
             await notifier.debugAddXP(addedXP);
             xpBarKey.currentState?.showXPGain(addedXP);
           },
@@ -232,6 +263,7 @@ class _TopQuickAction extends StatelessWidget {
   final IconData icon;
   final String label;
   final String routeName;
+
   const _TopQuickAction({
     super.key,
     required this.icon,
@@ -271,6 +303,7 @@ class _TopQuickAction extends StatelessWidget {
 
 class _TopDivider extends StatelessWidget {
   const _TopDivider({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -283,6 +316,7 @@ class _TopDivider extends StatelessWidget {
 }
 
 // === Slang of the Day card ===
+// NOTE: slangOfDayProvider now returns SlangEntry? (nullable)
 class _SlangOfDayCard extends StatelessWidget {
   final SlangEntry? entry;
   const _SlangOfDayCard({required this.entry});
@@ -308,8 +342,7 @@ class _SlangOfDayCard extends StatelessWidget {
             Expanded(
               child: Text(
                 'Slang of the Day: ${e.term}',
-                style: const TextStyle(
-                    fontWeight: FontWeight.w800, fontSize: 16),
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
               ),
             ),
             const Icon(Icons.chevron_right_rounded),
@@ -346,10 +379,8 @@ class _SlangTile extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: entry.emojis.take(2).map((e) {
                     return Padding(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 2),
-                      child: Text(e,
-                          style: const TextStyle(fontSize: 20)),
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: Text(e, style: const TextStyle(fontSize: 20)),
                     );
                   }).toList(),
                 ),
@@ -360,16 +391,16 @@ class _SlangTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(entry.term,
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w800)),
+                  Text(
+                    entry.term,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                  ),
                   const SizedBox(height: 4),
                   Text(
                     entry.meaning,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        color: Colors.white.withOpacity(0.85)),
+                    style: TextStyle(color: Colors.white.withOpacity(0.85)),
                   ),
                 ],
               ),

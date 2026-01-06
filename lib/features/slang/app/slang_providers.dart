@@ -1,20 +1,29 @@
 import 'dart:convert';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../domain/slang_entry.dart';
 
-/// ✅ Loads slangs from local JSON asset
-final slangListProvider = FutureProvider<List<SlangEntry>>((ref) async {
-  final jsonString = await rootBundle.loadString('assets/data/slang_local.json');
-  final List<dynamic> data = jsonDecode(jsonString);
-  return data.map((e) => SlangEntry.fromMap(e)).toList();
+/// Repository provider (caches slangs in memory so JSON loads only once)
+final slangRepositoryProvider = Provider<SlangRepository>((ref) {
+  return SlangRepository();
 });
 
-/// ✅ Random slang of the day
-final slangOfDayProvider = FutureProvider<SlangEntry>((ref) async {
+/// ✅ Loads slangs from local JSON asset (cached)
+final slangListProvider = FutureProvider<List<SlangEntry>>((ref) async {
+  final repo = ref.read(slangRepositoryProvider);
+  return repo.loadOnce();
+});
+
+/// ✅ Deterministic slang of the day (no shuffle, no mutation)
+final slangOfDayProvider = FutureProvider<SlangEntry?>((ref) async {
   final list = await ref.watch(slangListProvider.future);
-  list.shuffle();
-  return list.first;
+  if (list.isEmpty) return null;
+
+  final now = DateTime.now();
+  // Stable daily seed: YYYYMMDD
+  final seed = now.year * 10000 + now.month * 100 + now.day;
+  return list[seed % list.length];
 });
 
 /// ✅ Favorites provider (local-only)
@@ -35,4 +44,27 @@ class FavoritesNotifier extends StateNotifier<Set<String>> {
   }
 
   bool isFavorite(String term) => state.contains(term);
+}
+
+/// In-memory cached loader for local slang JSON
+class SlangRepository {
+  List<SlangEntry>? _cache;
+
+  Future<List<SlangEntry>> loadOnce() async {
+    if (_cache != null) return _cache!;
+
+    // Keep your exact path
+    final jsonString = await rootBundle.loadString('assets/data/slang_local.json');
+    final decoded = jsonDecode(jsonString);
+
+    if (decoded is! List) {
+      throw Exception('slang_local.json must be a JSON array of objects.');
+    }
+
+    _cache = decoded
+        .map((e) => SlangEntry.fromMap(Map<String, dynamic>.from(e as Map)))
+        .toList();
+
+    return _cache!;
+  }
 }
