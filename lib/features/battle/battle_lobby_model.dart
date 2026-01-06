@@ -1,23 +1,32 @@
-// lib/features/battle/battle_lobby_model.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class BattleLobby {
   final String id;
   final String hostId;
   final String? guestId;
-  final String status; // waiting | active | started | finished
+
+  /// waiting | active | started | finished
+  final String status;
+
+  /// Frozen at create/start
   final List<String> questions;
+
+  /// Shared pointer
   final int currentIndex;
 
-  // ✅ Freeze options per question index: "0": ["A","B","C","D"]
+  /// ✅ NEW: frozen options for ALL questions at start
+  /// Stored as: { "0": ["A","B","C","D"], "1": [...] }
   final Map<String, List<String>> options;
 
-  // ✅ Answers map: index -> uid -> {selected, correct, at}
+  /// ✅ Phase 2 answer map
+  /// { "0": { "uid1": {selected, correct, at}, "uid2": {...} }, "1": {...} }
   final Map<String, dynamic> answers;
 
-  // ✅ Locked map: index -> true
+  /// ✅ optional locks per question index
+  /// { "0": true, "1": true }
   final Map<String, dynamic> locked;
 
+  /// { uid: score }
   final Map<String, int> scores;
 
   final DateTime? createdAt;
@@ -41,17 +50,24 @@ class BattleLobby {
   factory BattleLobby.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
 
+    DateTime? _ts(dynamic v) {
+      if (v is Timestamp) return v.toDate();
+      return null;
+    }
+
+    // questions
     final qRaw = (data['questions'] as List?) ?? const [];
     final questions = qRaw.map((e) => e.toString()).toList();
 
-    // options
-    final oRaw = (data['options'] as Map?) ?? const {};
+    // ✅ options
+    final optRaw = (data['options'] as Map?) ?? const {};
     final options = <String, List<String>>{};
-    oRaw.forEach((k, v) {
-      options[k.toString()] = (v as List).map((e) => e.toString()).toList();
+    optRaw.forEach((k, v) {
+      final list = (v as List?) ?? const [];
+      options[k.toString()] = list.map((e) => e.toString()).toList();
     });
 
-    // answers/locked
+    // answers + locked
     final answers = Map<String, dynamic>.from((data['answers'] as Map?) ?? {});
     final locked = Map<String, dynamic>.from((data['locked'] as Map?) ?? {});
 
@@ -61,11 +77,6 @@ class BattleLobby {
     sRaw.forEach((k, v) {
       scores[k.toString()] = (v is int) ? v : int.tryParse(v.toString()) ?? 0;
     });
-
-    DateTime? _ts(dynamic v) {
-      if (v is Timestamp) return v.toDate();
-      return null;
-    }
 
     return BattleLobby(
       id: doc.id,
