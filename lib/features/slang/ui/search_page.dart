@@ -78,6 +78,8 @@ class _SearchPageState extends ConsumerState<SearchPage> {
 
   @override
   Widget build(BuildContext context) {
+    // 🔥 Warm slang cache as soon as home loads
+    ref.read(slangMapProvider.future);
     final listAsync = ref.watch(slangListProvider);
     final sodAsync = ref.watch(slangOfDayProvider);
 

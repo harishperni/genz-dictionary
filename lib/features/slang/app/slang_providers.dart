@@ -1,48 +1,60 @@
+// lib/features/slang/app/slang_providers.dart
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/slang_entry.dart';
 
-/// Top-level function (required for compute)
-List<SlangEntry> _parseSlangJson(String jsonString) {
-  final decoded = jsonDecode(jsonString);
+/// ===============================
+///  Repository (cached JSON loader)
+/// ===============================
 
-  if (decoded is! List) {
-    throw Exception('slang_local.json must be a JSON array of objects.');
-  }
-
-  return decoded
-      .map((e) => SlangEntry.fromMap(Map<String, dynamic>.from(e as Map)))
-      .toList();
-}
-
-/// Repository provider (caches slangs in memory so JSON loads only once)
 final slangRepositoryProvider = Provider<SlangRepository>((ref) {
   return SlangRepository();
 });
 
-/// ✅ Loads slangs from local JSON asset (cached + parsed off main thread)
+/// ✅ Loads slangs from local JSON asset (cached in memory)
 final slangListProvider = FutureProvider<List<SlangEntry>>((ref) async {
-  // Keeps it in memory even when you navigate around
-  ref.keepAlive();
-
+  ref.keepAlive(); // keep cached result around longer
   final repo = ref.read(slangRepositoryProvider);
   return repo.loadOnce();
 });
 
-/// ✅ Deterministic slang of the day (no shuffle, no mutation)
+/// ✅ Deterministic slang of the day (stable per day, no shuffle)
 final slangOfDayProvider = FutureProvider<SlangEntry?>((ref) async {
   final list = await ref.watch(slangListProvider.future);
   if (list.isEmpty) return null;
 
   final now = DateTime.now();
-  final seed = now.year * 10000 + now.month * 100 + now.day; // YYYYMMDD
+  // Stable daily seed: YYYYMMDD
+  final seed = now.year * 10000 + now.month * 100 + now.day;
   return list[seed % list.length];
 });
 
-/// ✅ Favorites provider (local-only)
+/// ===============================
+///  Fast lookup (term -> entry)
+/// ===============================
+
+/// ✅ Build a map for O(1) term lookups (built once after list loads)
+final slangMapProvider = FutureProvider<Map<String, SlangEntry>>((ref) async {
+  ref.keepAlive();
+  final list = await ref.watch(slangListProvider.future);
+  return {
+    for (final s in list) s.term.toLowerCase(): s,
+  };
+});
+
+/// ✅ Fetch one slang in O(1) using the map
+final slangByTermProvider =
+    FutureProvider.family<SlangEntry?, String>((ref, term) async {
+  final map = await ref.watch(slangMapProvider.future);
+  return map[term.toLowerCase()];
+});
+
+/// ===============================
+///  Favorites (local-only)
+/// ===============================
+
 final favoritesProvider =
     StateNotifierProvider<FavoritesNotifier, Set<String>>((ref) {
   return FavoritesNotifier();
@@ -62,19 +74,29 @@ class FavoritesNotifier extends StateNotifier<Set<String>> {
   bool isFavorite(String term) => state.contains(term);
 }
 
-/// In-memory cached loader for local slang JSON
+/// ===============================
+///  SlangRepository (in-memory cache)
+/// ===============================
+
 class SlangRepository {
   List<SlangEntry>? _cache;
 
   Future<List<SlangEntry>> loadOnce() async {
     if (_cache != null) return _cache!;
 
-    // Load asset string
+    // Keep your exact asset path
     final jsonString =
         await rootBundle.loadString('assets/data/slang_local.json');
 
-    // ✅ Parse in background isolate (prevents UI hitch)
-    _cache = await compute(_parseSlangJson, jsonString);
+    final decoded = jsonDecode(jsonString);
+
+    if (decoded is! List) {
+      throw Exception('slang_local.json must be a JSON array of objects.');
+    }
+
+    _cache = decoded
+        .map((e) => SlangEntry.fromMap(Map<String, dynamic>.from(e as Map)))
+        .toList(growable: false);
 
     return _cache!;
   }

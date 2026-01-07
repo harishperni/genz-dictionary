@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:share_plus/share_plus.dart';
+
 import '../app/slang_providers.dart';
 import '../domain/slang_entry.dart';
 import '../../../theme/app_theme.dart';
@@ -25,8 +26,15 @@ class _DetailPageState extends ConsumerState<DetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final listAsync = ref.watch(slangListProvider);
+    // 🔥 Warm the slang map cache (no await, no rebuild)
+    ref.read(slangMapProvider.future);
+    // ✅ O(1) lookup provider (fast)
+    final entryAsync = ref.watch(slangByTermProvider(widget.term));
     final fav = ref.watch(favoritesProvider);
+
+    // (Optional) kick off map/list load early in case we arrived here fast
+    // This is cheap because it’s cached; it just ensures it’s in-memory.
+    ref.read(slangMapProvider.future);
 
     return Container(
       decoration: neonGradientBackground(),
@@ -49,22 +57,27 @@ class _DetailPageState extends ConsumerState<DetailPage> {
               tooltip: 'Share',
               icon: const Icon(Icons.ios_share_rounded),
               onPressed: () async {
-                final list = await ref.read(slangListProvider.future);
-                final e = list.firstWhere(
-                  (s) => s.term.toLowerCase() == widget.term.toLowerCase(),
-                  orElse: () => list.first,
-                );
+                // ✅ Fetch the one entry (not the full list)
+                final e = await ref.read(slangByTermProvider(widget.term).future);
+
+                if (!mounted) return;
+                if (e == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Slang not found.')),
+                  );
+                  return;
+                }
+
                 await _onShareSlang(context, ref, e);
               },
             ),
           ],
         ),
-        body: listAsync.when(
-          data: (list) {
-            final e = list.firstWhere(
-              (s) => s.term.toLowerCase() == widget.term.toLowerCase(),
-              orElse: () => list.first,
-            );
+        body: entryAsync.when(
+          data: (e) {
+            if (e == null) {
+              return const Center(child: Text('Slang not found.'));
+            }
 
             // ✅ Track a view ONCE per open for badges/usage
             if (!_trackedView) {
@@ -85,7 +98,10 @@ class _DetailPageState extends ConsumerState<DetailPage> {
 
   // ✅ Clean, single share function with XP check
   Future<void> _onShareSlang(
-      BuildContext context, WidgetRef ref, SlangEntry e) async {
+    BuildContext context,
+    WidgetRef ref,
+    SlangEntry e,
+  ) async {
     // Capture the card as an image (offscreen)
     final imgBytes = await controller.captureFromWidget(
       _ShareCard(entry: e),
@@ -240,9 +256,10 @@ class _CardBody extends StatelessWidget {
                       color: Colors.white.withOpacity(chipOpacity),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text('#$t',
-                        style:
-                            const TextStyle(fontWeight: FontWeight.w600)),
+                    child: Text(
+                      '#$t',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
                   ),
                 )
                 .toList(),
