@@ -40,6 +40,18 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   final GlobalKey<XPProgressBarState> xpBarKey = GlobalKey<XPProgressBarState>();
 
   @override
+  void initState() {
+    super.initState();
+
+    // Preload slang list into memory cache so detail pages open faster
+    Future.microtask(() {
+      ref.read(slangListProvider.future);
+      // If you later add slangMapProvider, you can preload it too:
+      // ref.read(slangMapProvider.future);
+    });
+  }
+
+  @override
   void dispose() {
     _debounce?.cancel();
     _controller.dispose();
@@ -49,13 +61,13 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   void _onQueryChanged(String v) {
     _qRaw = v;
 
-    // Debounce filtering to avoid UI lag while typing
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 180), () {
       if (!mounted) return;
       setState(() => _q = _qRaw);
     });
   }
+}
 
   List<SlangEntry> _filter(List<SlangEntry> all, String q) {
     final query = q.trim().toLowerCase();
