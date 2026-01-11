@@ -52,7 +52,8 @@ class _JoinLobbyPageState extends ConsumerState<JoinLobbyPage> {
     });
 
     try {
-      const userId = "demo_user_2"; // TODO replace with FirebaseAuth uid later
+      const userId = FirebaseAuth.instance.currentUser!.uid;
+      final String hostUserId = FirebaseAuth.instance.currentUser!.uid; // TODO replace with FirebaseAuth uid later
 
       // ✅ join lobby (safe join logic should be in service)
       final success = await _service.joinLobby(code, userId);

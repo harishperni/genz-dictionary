@@ -31,7 +31,7 @@ class _CreateLobbyPageState extends ConsumerState<CreateLobbyPage> {
   bool _navigated = false;
 
   // Host user id for emulator testing
-  static const String _hostUserId = "demo_user_1";
+  static const String _hostUserId = FirebaseAuth.instance.currentUser!.uid
 
   @override
   void dispose() {
