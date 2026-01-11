@@ -1,4 +1,3 @@
-// lib/features/slang/ui/detail_page.dart
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,15 +25,8 @@ class _DetailPageState extends ConsumerState<DetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    // 🔥 Warm the slang map cache (no await, no rebuild)
-    ref.read(slangMapProvider.future);
-    // ✅ O(1) lookup provider (fast)
     final entryAsync = ref.watch(slangByTermProvider(widget.term));
     final fav = ref.watch(favoritesProvider);
-
-    // (Optional) kick off map/list load early in case we arrived here fast
-    // This is cheap because it’s cached; it just ensures it’s in-memory.
-    ref.read(slangMapProvider.future);
 
     return Container(
       decoration: neonGradientBackground(),
@@ -46,9 +38,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
             IconButton(
               tooltip: 'Favorite',
               icon: Icon(
-                fav.contains(widget.term)
-                    ? Icons.favorite
-                    : Icons.favorite_border,
+                fav.contains(widget.term) ? Icons.favorite : Icons.favorite_border,
               ),
               onPressed: () =>
                   ref.read(favoritesProvider.notifier).toggle(widget.term),
@@ -57,17 +47,8 @@ class _DetailPageState extends ConsumerState<DetailPage> {
               tooltip: 'Share',
               icon: const Icon(Icons.ios_share_rounded),
               onPressed: () async {
-                // ✅ Fetch the one entry (not the full list)
                 final e = await ref.read(slangByTermProvider(widget.term).future);
-
-                if (!mounted) return;
-                if (e == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Slang not found.')),
-                  );
-                  return;
-                }
-
+                if (e == null) return;
                 await _onShareSlang(context, ref, e);
               },
             ),
@@ -76,7 +57,9 @@ class _DetailPageState extends ConsumerState<DetailPage> {
         body: entryAsync.when(
           data: (e) {
             if (e == null) {
-              return const Center(child: Text('Slang not found.'));
+              return const Center(
+                child: Text('Slang not found.', style: TextStyle(color: Colors.white)),
+              );
             }
 
             // ✅ Track a view ONCE per open for badges/usage
@@ -102,7 +85,6 @@ class _DetailPageState extends ConsumerState<DetailPage> {
     WidgetRef ref,
     SlangEntry e,
   ) async {
-    // Capture the card as an image (offscreen)
     final imgBytes = await controller.captureFromWidget(
       _ShareCard(entry: e),
       pixelRatio: ui.window.devicePixelRatio.clamp(2.0, 3.0),
@@ -114,7 +96,6 @@ class _DetailPageState extends ConsumerState<DetailPage> {
       mimeType: 'image/png',
     );
 
-    // Use ShareResult to ensure real share
     final result = await Share.shareXFiles(
       [file],
       text: 'Gen Z Dictionary: ${e.term}',
@@ -156,7 +137,7 @@ class _ShareCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const bg = Color(0xFF0D1021); // dark navy background
+    const bg = Color(0xFF0D1021);
     return Container(
       color: bg,
       padding: const EdgeInsets.all(24),
@@ -165,8 +146,7 @@ class _ShareCard extends StatelessWidget {
         style: const TextStyle(color: Colors.white),
         child: _CardBody(
           entry: entry,
-          titleStyle:
-              const TextStyle(fontSize: 56, fontWeight: FontWeight.w900),
+          titleStyle: const TextStyle(fontSize: 56, fontWeight: FontWeight.w900),
           meaningStyle: const TextStyle(fontSize: 30, height: 1.25),
           exampleStyle: const TextStyle(fontSize: 28),
           tagChipOpacity: 0.12,
@@ -250,16 +230,13 @@ class _CardBody extends StatelessWidget {
             children: entry.tags
                 .map(
                   (t) => Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(chipOpacity),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
-                      '#$t',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
+                    child: Text('#$t',
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
                   ),
                 )
                 .toList(),

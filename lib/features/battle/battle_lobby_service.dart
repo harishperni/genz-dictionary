@@ -9,19 +9,41 @@ class BattleLobbyService {
   DocumentReference<Map<String, dynamic>> _ref(String code) =>
       _db.collection(_collection).doc(code);
 
+  /// Normalize any user-entered lobby code (QR / typing / spaces)
   String normalizeCode(String raw) {
-    return raw
-        .toUpperCase()
-        .replaceAll(RegExp(r'[^A-Z0-9]'), '')
-        .trim();
+    return raw.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '').trim();
   }
 
   String _newCode() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no O/0/I/1
     final r = Random.secure();
     return List.generate(6, (_) => chars[r.nextInt(chars.length)]).join();
   }
 
+  /// ✅ Estimate server clock offset so all devices use the same "now"
+  /// Returns: serverNow - localNow (Duration)
+  Future<Duration> getServerTimeOffset() async {
+    final ref = _db.collection(_collection).doc('_time_sync');
+
+    await ref.set({'ts': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+
+    DocumentSnapshot<Map<String, dynamic>> snap = await ref.get();
+    Timestamp? ts = snap.data()?['ts'] as Timestamp?;
+
+    if (ts == null) {
+      await Future.delayed(const Duration(milliseconds: 120));
+      snap = await ref.get();
+      ts = snap.data()?['ts'] as Timestamp?;
+    }
+
+    if (ts == null) return Duration.zero;
+
+    final serverNow = ts.toDate();
+    final localNow = DateTime.now();
+    return serverNow.difference(localNow);
+  }
+
+  /// Host creates lobby (status=waiting)
   Future<String> createLobby({
     required String userId,
     required List<String> questions,
@@ -39,28 +61,32 @@ class BattleLobbyService {
       await ref.set({
         'hostId': userId,
         'guestId': null,
-        'status': 'waiting',
+        'status': 'waiting', // waiting -> active -> started -> finished
         'questions': q,
         'currentIndex': 0,
         'scores': {userId: 0},
         'createdAt': FieldValue.serverTimestamp(),
         'startedAt': null,
 
-        // phase 2 maps
+        // Phase 2+ fields
         'answers': {},
         'locked': {},
 
-        // ✅ options will be generated on startBattle (frozen for all questions)
+        // frozen options per index
         'options': {},
-        // ✅ optional: prevents double-advance
-        'lastAutoAdvancedIndex': -1,
+
+        // timer fields
+        'timerSeconds': 10,
+        'questionStartedAt': null,
       });
 
       return code;
     }
+
     throw Exception('Failed to create unique lobby code.');
   }
 
+  /// Guest joins lobby (waiting/active) -> sets guestId + status=active
   Future<bool> joinLobby(String rawCode, String userId) async {
     final code = normalizeCode(rawCode);
     if (code.isEmpty) return false;
@@ -73,12 +99,13 @@ class BattleLobbyService {
 
       final data = snap.data() ?? {};
       final status = (data['status'] ?? 'waiting') as String;
+
       final hostId = (data['hostId'] ?? '') as String;
       final guestId = data['guestId'] as String?;
 
       if (status == 'started' || status == 'finished') return false;
 
-      // ✅ block if someone else already joined
+      // SAFE JOIN: block if someone else already joined
       if (guestId != null && guestId != userId) return false;
 
       final scores = Map<String, dynamic>.from((data['scores'] as Map?) ?? {});
@@ -95,11 +122,12 @@ class BattleLobbyService {
     });
   }
 
-  /// ✅ Host starts battle (active -> started) and freezes options for ALL questions.
-  /// Pass a map: term -> meaning so we can build real MCQ options.
+  /// Host starts battle (active -> started)
+  /// Also freezes options for ALL questions once.
   Future<void> startBattle({
     required String rawCode,
     required Map<String, String> termToMeaning,
+    int timerSeconds = 10,
   }) async {
     final code = normalizeCode(rawCode);
     if (code.isEmpty) throw Exception('Invalid lobby code.');
@@ -114,8 +142,8 @@ class BattleLobbyService {
       final status = (data['status'] ?? 'waiting') as String;
       final hostId = (data['hostId'] ?? '') as String;
       final guestId = data['guestId'] as String?;
-      final questionsRaw = (data['questions'] as List?) ?? const <dynamic>[];
-      final questions = questionsRaw.map((e) => e.toString()).toList();
+      final qRaw = (data['questions'] as List?) ?? const <dynamic>[];
+      final questions = qRaw.map((e) => e.toString()).toList();
 
       if (status != 'active') {
         throw Exception('Lobby not ready (need guest to join).');
@@ -127,82 +155,56 @@ class BattleLobbyService {
         throw Exception('No questions in lobby.');
       }
 
-      // Build options for ALL indices once
-      final allMeanings = termToMeaning.values
-          .map((m) => m.trim())
-          .where((m) => m.isNotEmpty)
-          .toList();
+      // scores reset
+      final scores = <String, dynamic>{hostId: 0, guestId: 0};
 
-      if (allMeanings.length < 4) {
-        throw Exception('Not enough meanings to generate options.');
-      }
-
-      final options = <String, List<String>>{};
-      final rng = Random.secure();
-
+      // ✅ Build & freeze options for ALL questions once
+      final options = <String, dynamic>{};
       for (int i = 0; i < questions.length; i++) {
         final term = questions[i];
-        final correct = (termToMeaning[term] ?? '').trim();
-        if (correct.isEmpty) {
-          // fallback: just pick some meanings, but still include something
-          allMeanings.shuffle(rng);
-          options['$i'] = allMeanings.take(4).toList();
-          continue;
-        }
+        final correct = termToMeaning[term] ?? '';
 
-        // pick 3 wrong meanings
-        final wrongPool = allMeanings.where((m) => m != correct).toList();
-        wrongPool.shuffle(rng);
-        final wrong = wrongPool.take(3).toList();
+        // build 3 random wrong meanings + correct
+        final wrongPool = termToMeaning.values
+            .where((m) => m.trim().isNotEmpty && m.trim() != correct.trim())
+            .toList();
 
-        final opts = <String>[correct, ...wrong]..shuffle(rng);
-        options['$i'] = opts;
+        wrongPool.shuffle();
+        final wrongs = wrongPool.take(3).toList();
+
+        final list = <String>[correct, ...wrongs];
+        list.shuffle();
+        options['$i'] = list;
       }
 
       tx.update(ref, {
         'status': 'started',
         'startedAt': FieldValue.serverTimestamp(),
         'currentIndex': 0,
-        'scores': {hostId: 0, guestId: 0},
+        'scores': scores,
+
         'answers': {},
         'locked': {},
-        'options': options,
-        'lastAutoAdvancedIndex': -1,
+
+        'options': options, // ✅ frozen for whole game
+
+        'timerSeconds': timerSeconds,
+        'questionStartedAt': FieldValue.serverTimestamp(), // ✅ start timer now
       });
     });
   }
 
-  Future<void> advanceQuestion(String rawCode) async {
-    final code = normalizeCode(rawCode);
-    final ref = _ref(code);
-
-    await _db.runTransaction((tx) async {
-      final snap = await tx.get(ref);
-      if (!snap.exists) throw Exception('Lobby not found.');
-
-      final data = snap.data() ?? {};
-      final status = (data['status'] ?? 'waiting') as String;
-      final questions = (data['questions'] as List? ?? const []);
-      final idx = (data['currentIndex'] ?? 0) as int;
-
-      if (status != 'started') return;
-
-      final next = idx + 1;
-      if (next >= questions.length) {
-        tx.update(ref, {'status': 'finished'});
-      } else {
-        tx.update(ref, {'currentIndex': next});
-      }
-    });
-  }
-
-  /// ✅ Submit an answer + score + lock when both answered
+  /// Submit answer:
+  /// - saves answers[index][uid]
+  /// - increments score once if correct
+  /// - locks when both answered
+  /// - auto-advances when both answered ✅
   Future<void> submitAnswer({
     required String rawCode,
     required String userId,
     required int index,
     required String selected,
-    required bool correct,
+    required String correctAnswer,
   }) async {
     final code = normalizeCode(rawCode);
     final ref = _ref(code);
@@ -217,54 +219,74 @@ class BattleLobbyService {
 
       final hostId = (data['hostId'] ?? '') as String;
       final guestId = (data['guestId'] ?? '') as String;
+      final questions = (data['questions'] as List? ?? const [])
+          .map((e) => e.toString())
+          .toList();
+      final currentIndex = (data['currentIndex'] ?? 0) as int;
 
       final answers = Map<String, dynamic>.from((data['answers'] as Map?) ?? {});
       final locked = Map<String, dynamic>.from((data['locked'] as Map?) ?? {});
-      final scores = Map<String, dynamic>.from((data['scores'] as Map?) ?? {});
 
       if (locked['$index'] == true) return;
 
-      final perIndex =
+      final existingForIndex =
           Map<String, dynamic>.from((answers['$index'] as Map?) ?? {});
-      final alreadyAnswered = perIndex.containsKey(userId);
+      final alreadyAnswered = existingForIndex.containsKey(userId);
 
-      perIndex[userId] = {
+      final correct = selected.trim() == correctAnswer.trim();
+
+      existingForIndex[userId] = {
         'selected': selected,
         'correct': correct,
         'at': FieldValue.serverTimestamp(),
       };
-      answers['$index'] = perIndex;
+      answers['$index'] = existingForIndex;
 
-      // ensure score keys exist
-      if (hostId.isNotEmpty) scores.putIfAbsent(hostId, () => 0);
+      final scores = Map<String, dynamic>.from((data['scores'] as Map?) ?? {});
+      scores.putIfAbsent(hostId, () => 0);
       if (guestId.isNotEmpty) scores.putIfAbsent(guestId, () => 0);
 
-      // +1 only once per question if correct
-      if (!alreadyAnswered && correct) {
+      if (!alreadyAnswered && correct == true) {
         final cur = (scores[userId] ?? 0) as int;
         scores[userId] = cur + 1;
       }
 
       final bothAnswered = hostId.isNotEmpty &&
           guestId.isNotEmpty &&
-          perIndex.containsKey(hostId) &&
-          perIndex.containsKey(guestId);
+          existingForIndex.containsKey(hostId) &&
+          existingForIndex.containsKey(guestId);
+
+      final updates = <String, dynamic>{
+        'answers': answers,
+        'scores': scores,
+      };
 
       if (bothAnswered) {
         locked['$index'] = true;
+        updates['locked'] = locked;
+
+        // ✅ AUTO-ADVANCE only if this is the current question
+        if (index == currentIndex) {
+          final next = currentIndex + 1;
+          if (next >= questions.length) {
+            updates['status'] = 'finished';
+          } else {
+            updates['currentIndex'] = next;
+            updates['questionStartedAt'] = FieldValue.serverTimestamp(); // reset timer
+          }
+        }
       }
 
-      tx.update(ref, {
-        'answers': answers,
-        'locked': locked,
-        'scores': scores,
-      });
+      tx.update(ref, updates);
     });
   }
 
-  /// ✅ Safe auto-advance (call from UI when locked)
-  /// Prevents double-advance using lastAutoAdvancedIndex + currentIndex check.
-  Future<void> tryAutoAdvanceIfLocked(String rawCode) async {
+  /// If timer ends: mark user as wrong/no-answer (optional), or just auto-advance after both timed out.
+  /// We'll keep it simple: allow quiz page to call this to "force lock" when time is up.
+  Future<void> forceLockIfTimeUp({
+    required String rawCode,
+    required int index,
+  }) async {
     final code = normalizeCode(rawCode);
     final ref = _ref(code);
 
@@ -273,32 +295,34 @@ class BattleLobbyService {
       if (!snap.exists) return;
 
       final data = snap.data() ?? {};
-      final status = (data['status'] ?? 'waiting') as String;
-      if (status != 'started') return;
+      if ((data['status'] ?? '') != 'started') return;
 
-      final idx = (data['currentIndex'] ?? 0) as int;
       final locked = Map<String, dynamic>.from((data['locked'] as Map?) ?? {});
-      final lastAuto = (data['lastAutoAdvancedIndex'] ?? -1) as int;
+      if (locked['$index'] == true) return;
 
-      // only advance once per index
-      if (lastAuto == idx) return;
+      // Just lock (no score change)
+      locked['$index'] = true;
 
-      if (locked['$idx'] != true) return;
+      final questions = (data['questions'] as List? ?? const [])
+          .map((e) => e.toString())
+          .toList();
+      final currentIndex = (data['currentIndex'] ?? 0) as int;
 
-      final questions = (data['questions'] as List? ?? const []);
-      final next = idx + 1;
+      final updates = <String, dynamic>{
+        'locked': locked,
+      };
 
-      if (next >= questions.length) {
-        tx.update(ref, {
-          'status': 'finished',
-          'lastAutoAdvancedIndex': idx,
-        });
-      } else {
-        tx.update(ref, {
-          'currentIndex': next,
-          'lastAutoAdvancedIndex': idx,
-        });
+      if (index == currentIndex) {
+        final next = currentIndex + 1;
+        if (next >= questions.length) {
+          updates['status'] = 'finished';
+        } else {
+          updates['currentIndex'] = next;
+          updates['questionStartedAt'] = FieldValue.serverTimestamp();
+        }
       }
+
+      tx.update(ref, updates);
     });
   }
 

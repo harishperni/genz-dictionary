@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import 'battle_lobby_service.dart';
 import 'battle_lobby_model.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class JoinLobbyPage extends ConsumerStatefulWidget {
   const JoinLobbyPage({super.key});
@@ -52,8 +53,8 @@ class _JoinLobbyPageState extends ConsumerState<JoinLobbyPage> {
     });
 
     try {
-      const userId = FirebaseAuth.instance.currentUser!.uid;
-      final String hostUserId = FirebaseAuth.instance.currentUser!.uid; // TODO replace with FirebaseAuth uid later
+      final userId = FirebaseAuth.instance.currentUser!.uid;
+     // TODO replace with FirebaseAuth uid later
 
       // ✅ join lobby (safe join logic should be in service)
       final success = await _service.joinLobby(code, userId);

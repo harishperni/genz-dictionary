@@ -7,6 +7,8 @@ import '../slang/domain/slang_entry.dart';
 import 'battle_lobby_model.dart';
 import 'battle_lobby_service.dart';
 
+enum _OptionVisualState { neutral, correct, wrong }
+
 class BattleQuizPage extends ConsumerStatefulWidget {
   final String code;
   final String userId;
@@ -23,30 +25,53 @@ class BattleQuizPage extends ConsumerStatefulWidget {
 
 class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
   final BattleLobbyService _service = BattleLobbyService();
-  bool _submitting = false;
 
-  // prevent repeated auto-advance calls per index on this client
-  final Set<int> _autoAdvanceRequested = {};
+  // Local UI state per question index
+  String? _mySelected;
+  bool _submitted = false;
+
+  // Basic timer (Phase 3 will replace with synced server-based timer)
+  Timer? _tick;
+  int _remaining = 10;
+  int _lastIndexSeen = -1;
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  void _resetForIndex(int idx, int durationSec) {
+    _mySelected = null;
+    _submitted = false;
+
+    _tick?.cancel();
+    _remaining = durationSec;
+
+    _tick = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return;
+      setState(() {
+        _remaining -= 1;
+        if (_remaining <= 0) {
+          _remaining = 0;
+          t.cancel();
+          // If time ends and user didn't answer, do nothing for now (phase 3 can auto-submit)
+        }
+      });
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final stream = _service.watchLobby(widget.code);
+    final lobbyStream = _service.watchLobby(widget.code);
 
     return StreamBuilder<BattleLobby?>(
-      stream: stream,
-      builder: (context, snap) {
-        final lobby = snap.data;
-
-        if (lobby == null) {
-          return const Scaffold(
-            body: Center(child: Text('Lobby not found')),
-          );
-        }
+      stream: lobbyStream,
+      builder: (context, snapshot) {
+        final lobby = snapshot.data;
 
         return Scaffold(
-          appBar: AppBar(
-            title: Text('Battle Quiz • ${lobby.id}'),
-          ),
+          appBar: AppBar(title: Text('Battle Quiz • ${widget.code}')),
           body: Container(
             padding: const EdgeInsets.all(16),
             decoration: const BoxDecoration(
@@ -63,259 +88,293 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
     );
   }
 
-  Widget _body(BuildContext context, BattleLobby lobby) {
-    if (lobby.status != 'started' && lobby.status != 'finished') {
+  Widget _body(BuildContext context, BattleLobby? lobby) {
+    if (lobby == null) {
       return const Center(
-        child: Text(
-          'Waiting for host to start…',
-          style: TextStyle(color: Colors.white),
-        ),
+        child: Text('Lobby not found.', style: TextStyle(color: Colors.white)),
       );
     }
 
-    final isHost = lobby.hostId == widget.userId;
+    if (lobby.status != 'started' && lobby.status != 'finished') {
+      return const Center(
+        child: Text('Waiting for host to start…',
+            style: TextStyle(color: Colors.white)),
+      );
+    }
 
-    // finished screen
     if (lobby.status == 'finished') {
-      final hostScore = lobby.scores[lobby.hostId] ?? 0;
-      final guestScore = (lobby.guestId != null) ? (lobby.scores[lobby.guestId!] ?? 0) : 0;
-
-      String winner;
-      if (hostScore > guestScore) winner = 'Host wins!';
-      else if (guestScore > hostScore) winner = 'Guest wins!';
-      else winner = 'It’s a tie!';
-
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text('Battle finished!', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 10),
-            Text('Host: $hostScore   Guest: $guestScore', style: const TextStyle(color: Colors.white70)),
-            const SizedBox(height: 10),
-            Text(winner, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 18),
-            OutlinedButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Back'),
-            ),
-          ],
-        ),
+      return const Center(
+        child:
+            Text('Battle finished.', style: TextStyle(color: Colors.white)),
       );
     }
 
     final idx = lobby.currentIndex;
-    final idxKey = '$idx';
+    final durationSec = lobby.durationSec;
+
+    if (idx != _lastIndexSeen) {
+      _lastIndexSeen = idx;
+      _resetForIndex(idx, durationSec);
+    }
 
     if (idx < 0 || idx >= lobby.questions.length) {
       return const Center(
-        child: Text('Invalid question index.', style: TextStyle(color: Colors.white)),
+        child: Text('Invalid question index.',
+            style: TextStyle(color: Colors.white)),
       );
     }
 
     final term = lobby.questions[idx];
 
-    // ✅ frozen options must exist for this index
-    final options = lobby.options[idxKey];
-    if (options == null || options.length < 2) {
-      return const Center(
-        child: Text(
-          'Preparing question…',
-          style: TextStyle(color: Colors.white),
-        ),
-      );
-    }
+    // 🔒 Locked status from Firestore (both answered)
+    final locked = lobby.locked['$idx'] == true;
 
-    final answersForIdx = (lobby.answers[idxKey] as Map?) ?? {};
-    final myAnswer = answersForIdx[widget.userId] as Map?;
-    final hostAnswer = (answersForIdx[lobby.hostId] as Map?);
-    final guestAnswer = (lobby.guestId != null) ? (answersForIdx[lobby.guestId!] as Map?) : null;
+    // Answers map for this index
+    final answersForIndex =
+        (lobby.answers['$idx'] as Map?)?.cast<String, dynamic>() ?? {};
 
-    final iAnswered = myAnswer != null;
-    final opponentAnswered = (isHost ? (guestAnswer != null) : (hostAnswer != null));
-    final locked = lobby.locked[idxKey] == true;
+    final myAnswerMap =
+        (answersForIndex[widget.userId] as Map?)?.cast<String, dynamic>();
+    final myAnswer = myAnswerMap?['selected']?.toString();
 
-    // ✅ auto-advance when locked
-    if (locked && !_autoAdvanceRequested.contains(idx)) {
-      _autoAdvanceRequested.add(idx);
-      // small delay so users can see feedback
-      Future.delayed(const Duration(milliseconds: 650), () {
-        _service.tryAutoAdvanceIfLocked(widget.code);
-      });
-    }
+    final opponentId = (lobby.hostId == widget.userId)
+        ? (lobby.guestId ?? '')
+        : lobby.hostId;
 
+    final oppAnswerMap =
+        (answersForIndex[opponentId] as Map?)?.cast<String, dynamic>();
+    final oppAnswered = oppAnswerMap != null;
+
+    // Reveal when I answered OR locked
+    final reveal = myAnswer != null || locked;
+
+    // Scores
     final hostScore = lobby.scores[lobby.hostId] ?? 0;
-    final guestScore = (lobby.guestId != null) ? (lobby.scores[lobby.guestId!] ?? 0) : 0;
+    final guestScore =
+        (lobby.guestId == null) ? 0 : (lobby.scores[lobby.guestId!] ?? 0);
 
-    final listAsync = ref.watch(slangListProvider);
+    return ref.watch(slangListProvider).when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(
+            child: Text('Error: $e', style: const TextStyle(color: Colors.white)),
+          ),
+          data: (slangs) {
+            final entry = _findEntry(slangs, term);
+            final correctAnswer = entry.meaning.trim();
 
-    return listAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error: $e', style: const TextStyle(color: Colors.white))),
-      data: (slangs) {
-        final SlangEntry entry = slangs.firstWhere(
-          (s) => s.term.toLowerCase() == term.toLowerCase(),
-          orElse: () => slangs.first,
-        );
+            // ✅ MUST come from lobby.options to prevent jumbling
+            final options = lobby.options['$idx'];
 
-        final correctAnswer = entry.meaning.trim();
+            if (options == null || options.length < 4) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _topRow(hostScore: hostScore, guestScore: guestScore),
+                  const SizedBox(height: 12),
+                  _banner(text: 'Preparing options…', icon: Icons.hourglass_top),
+                  const SizedBox(height: 16),
+                  _questionCard(idx: idx, total: lobby.questions.length, entry: entry),
+                  const Spacer(),
+                  const Center(child: CircularProgressIndicator()),
+                ],
+              );
+            }
 
-        // banners
-        final bannerText = locked
-            ? 'Locked 🔒 both answered'
-            : opponentAnswered
-                ? 'Opponent answered ✅'
-                : 'Waiting for opponent…';
-
-        final bannerColor = locked
-            ? Colors.green.withOpacity(0.18)
-            : opponentAnswered
-                ? Colors.blue.withOpacity(0.18)
-                : Colors.orange.withOpacity(0.18);
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // score row
-            Row(
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: _scorePill(
-                    icon: Icons.person,
-                    label: 'Host: $hostScore',
-                  ),
+                // ✅ Score row (restored old style)
+                _topRow(hostScore: hostScore, guestScore: guestScore),
+
+                const SizedBox(height: 12),
+
+                // Timer + status
+                Row(
+                  children: [
+                    _pill(
+                      icon: Icons.timer_rounded,
+                      text: '${_remaining}s',
+                      tone: _remaining <= 3 ? Colors.redAccent : Colors.white,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: locked
+                          ? _banner(
+                              text: 'Locked 🔒 both answered',
+                              icon: Icons.lock_rounded,
+                            )
+                          : (oppAnswered
+                              ? _banner(
+                                  text: 'Opponent answered ✅',
+                                  icon: Icons.check_circle_rounded,
+                                )
+                              : _banner(
+                                  text: 'Waiting for opponent…',
+                                  icon: Icons.person_outline,
+                                )),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _scorePill(
-                    icon: Icons.person_outline,
-                    label: 'Guest: $guestScore',
+
+                const SizedBox(height: 14),
+
+                _questionCard(idx: idx, total: lobby.questions.length, entry: entry),
+
+                const SizedBox(height: 12),
+
+                // ✅ Options (restored highlight behavior)
+                for (final opt in options) ...[
+                  const SizedBox(height: 10),
+                  _optionTile(
+                    opt: opt,
+                    correct: correctAnswer,
+                    myAnswer: myAnswer,
+                    reveal: reveal,
+                    locked: locked,
+                    onTap: (locked || _submitted)
+                        ? null
+                        : () async {
+                            setState(() {
+                              _mySelected = opt;
+                              _submitted = true;
+                            });
+
+                            final isCorrect =
+                                opt.trim() == correctAnswer.trim();
+
+                            await _service.submitAnswer(
+                              rawCode: widget.code,
+                              userId: widget.userId,
+                              index: idx,
+                              selected: opt,
+                              correctAnswer: correctAnswer,
+                            );
+                          },
                   ),
-                ),
+                ],
+
+                const Spacer(),
+
+                // No “correct answer” shown anywhere — this fixes your bug #1
               ],
-            ),
-            const SizedBox(height: 10),
-
-            // status banner
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: bannerColor,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.white.withOpacity(0.12)),
-              ),
-              child: Text(
-                bannerText,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            Text(
-              'Question ${idx + 1} / ${lobby.questions.length}',
-              style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 10),
-
-            // question card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withOpacity(0.12)),
-              ),
-              child: Text(
-                'What does “${entry.term}” mean?',
-                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            // options
-            for (final opt in options) ...[
-              _optionTile(
-                text: opt,
-                enabled: !_submitting && !iAnswered && !locked,
-                // ✅ highlight only after YOU answered
-                state: _computeOptionState(
-                  iAnswered: iAnswered,
-                  mySelected: myAnswer?['selected']?.toString(),
-                  myCorrect: myAnswer?['correct'] == true,
-                  opt: opt,
-                  correctAnswer: correctAnswer,
-                ),
-                onTap: () async {
-                  if (_submitting || iAnswered || locked) return;
-
-                  setState(() => _submitting = true);
-
-                  final selected = opt.trim();
-                  final isCorrect = selected == correctAnswer;
-
-                  try {
-                    await _service.submitAnswer(
-                      rawCode: widget.code,
-                      userId: widget.userId,
-                      index: idx,
-                      selected: selected,
-                      correct: isCorrect,
-                    );
-                  } finally {
-                    if (mounted) setState(() => _submitting = false);
-                  }
-                },
-              ),
-              const SizedBox(height: 10),
-            ],
-
-            const Spacer(),
-
-            // ✅ only show correct meaning AFTER you answer (no spoiler)
-            if (iAnswered) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.06),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.white.withOpacity(0.10)),
-                ),
-                child: Text(
-                  'Correct meaning: $correctAnswer',
-                  style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
-                ),
-              ),
-              const SizedBox(height: 10),
-            ],
-
-            // ✅ remove manual next button (auto-advance). Keep a disabled button just for clarity.
-            ElevatedButton(
-              onPressed: null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF7C3AED),
-                disabledBackgroundColor: const Color(0xFF7C3AED).withOpacity(0.25),
-                foregroundColor: Colors.white,
-                minimumSize: const Size.fromHeight(52),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-              child: Text(
-                locked ? 'Advancing…' : (isHost ? 'Auto-advance when both answer' : 'Waiting for opponent…'),
-                style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-            ),
-          ],
+            );
+          },
         );
-      },
+  }
+
+  SlangEntry _findEntry(List<SlangEntry> slangs, String term) {
+    final t = term.toLowerCase().trim();
+    for (final s in slangs) {
+      if (s.term.toLowerCase().trim() == t) return s;
+    }
+    return slangs.first;
+  }
+
+  Widget _topRow({required int hostScore, required int guestScore}) {
+    return Row(
+      children: [
+        Expanded(child: _scoreCard(label: 'Host', score: hostScore)),
+        const SizedBox(width: 10),
+        Expanded(child: _scoreCard(label: 'Guest', score: guestScore)),
+      ],
     );
   }
 
-  Widget _scorePill({required IconData icon, required String label}) {
+  Widget _questionCard({
+    required int idx,
+    required int total,
+    required SlangEntry entry,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Question ${idx + 1} / $total',
+          style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withOpacity(0.12)),
+          ),
+          child: Text(
+            'What does “${entry.term}” mean?',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _optionTile({
+    required String opt,
+    required String correct,
+    required String? myAnswer,
+    required bool reveal,
+    required bool locked,
+    required VoidCallback? onTap,
+  }) {
+    final state = _optionState(
+      opt: opt,
+      correct: correct,
+      myAnswer: myAnswer,
+      reveal: reveal,
+    );
+
+    Color borderColor = Colors.white.withOpacity(0.14);
+    Color fillColor = Colors.white.withOpacity(0.06);
+
+    if (state == _OptionVisualState.correct) {
+      borderColor = Colors.greenAccent.withOpacity(0.9);
+      fillColor = Colors.greenAccent.withOpacity(0.18);
+    } else if (state == _OptionVisualState.wrong) {
+      borderColor = Colors.redAccent.withOpacity(0.9);
+      fillColor = Colors.redAccent.withOpacity(0.16);
+    }
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: fillColor,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: borderColor),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                opt,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            if (locked)
+              const Icon(Icons.lock_rounded, color: Colors.white70, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _banner({required String text, required IconData icon}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
+        color: Colors.white.withOpacity(0.07),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.white.withOpacity(0.12)),
       ),
@@ -323,89 +382,78 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
         children: [
           Icon(icon, color: Colors.white70, size: 18),
           const SizedBox(width: 8),
-          Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  _OptionState _computeOptionState({
-    required bool iAnswered,
-    required String? mySelected,
-    required bool myCorrect,
-    required String opt,
-    required String correctAnswer,
-  }) {
-    if (!iAnswered) return _OptionState.normal;
-
-    final o = opt.trim();
-    final sel = (mySelected ?? '').trim();
-
-    if (o == sel && myCorrect) return _OptionState.correctSelected;
-    if (o == sel && !myCorrect) return _OptionState.wrongSelected;
-
-    // also show the correct one in green outline once answered
-    if (o == correctAnswer.trim()) return _OptionState.correctReveal;
-
-    return _OptionState.dim;
-  }
-
-  Widget _optionTile({
-    required String text,
-    required bool enabled,
-    required _OptionState state,
-    required VoidCallback onTap,
-  }) {
-    Color border = Colors.white.withOpacity(0.12);
-    Color fill = Colors.white.withOpacity(0.06);
-
-    switch (state) {
-      case _OptionState.normal:
-        break;
-      case _OptionState.correctSelected:
-        border = Colors.greenAccent.withOpacity(0.8);
-        fill = Colors.greenAccent.withOpacity(0.15);
-        break;
-      case _OptionState.wrongSelected:
-        border = Colors.redAccent.withOpacity(0.8);
-        fill = Colors.redAccent.withOpacity(0.15);
-        break;
-      case _OptionState.correctReveal:
-        border = Colors.greenAccent.withOpacity(0.5);
-        fill = Colors.white.withOpacity(0.06);
-        break;
-      case _OptionState.dim:
-        border = Colors.white.withOpacity(0.08);
-        fill = Colors.white.withOpacity(0.03);
-        break;
-    }
-
-    return InkWell(
-      onTap: enabled ? onTap : null,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        decoration: BoxDecoration(
-          color: fill,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: border),
-        ),
-        child: Text(
-          text,
-          style: TextStyle(
-            color: Colors.white.withOpacity(state == _OptionState.dim ? 0.55 : 1),
-            fontWeight: FontWeight.w700,
+  Widget _pill({required IconData icon, required String text, required Color tone}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.12)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: tone, size: 18),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: TextStyle(color: tone, fontWeight: FontWeight.w900),
           ),
-        ),
+        ],
       ),
     );
   }
-}
 
-enum _OptionState {
-  normal,
-  correctSelected,
-  wrongSelected,
-  correctReveal,
-  dim,
+  // ✅ Restored score UI (your old style)
+  static Widget _scoreCard({required String label, required int score}) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.12)),
+      ),
+      child: Row(
+        children: [
+          Text(label,
+              style: const TextStyle(
+                  color: Colors.white70, fontWeight: FontWeight.w800)),
+          const Spacer(),
+          Text('$score',
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 18)),
+        ],
+      ),
+    );
+  }
+
+  // ✅ Restored option highlight logic
+  _OptionVisualState _optionState({
+    required String opt,
+    required String correct,
+    required String? myAnswer,
+    required bool reveal,
+  }) {
+    if (!reveal) return _OptionVisualState.neutral;
+    final isCorrect = opt.trim() == correct.trim();
+    final isMine = myAnswer != null && opt.trim() == myAnswer.trim();
+    if (isCorrect) return _OptionVisualState.correct;
+    if (isMine && !isCorrect) return _OptionVisualState.wrong;
+    return _OptionVisualState.neutral;
+  }
 }

@@ -8,27 +8,30 @@ class BattleLobby {
   /// waiting | active | started | finished
   final String status;
 
-  /// Frozen at create/start
   final List<String> questions;
-
-  /// Shared pointer
   final int currentIndex;
 
-  /// ✅ NEW: frozen options for ALL questions at start
-  /// Stored as: { "0": ["A","B","C","D"], "1": [...] }
+  /// Phase 2/3: precomputed options for each question index
+  /// Firestore shape:
+  /// options: { "0": ["A","B","C","D"], "1": [...] }
   final Map<String, List<String>> options;
 
-  /// ✅ Phase 2 answer map
-  /// { "0": { "uid1": {selected, correct, at}, "uid2": {...} }, "1": {...} }
+  /// Phase 2: answers map
+  /// answers: { "0": { "uid1": {selected, correct, at}, "uid2": {...} } }
   final Map<String, dynamic> answers;
 
-  /// ✅ optional locks per question index
-  /// { "0": true, "1": true }
-  final Map<String, dynamic> locked;
+  /// Phase 2: locked map
+  /// locked: { "0": true, "1": true }
+  final Map<String, bool> locked;
 
-  /// { uid: score }
+  /// scores: { uid: int }
   final Map<String, int> scores;
 
+  /// Phase 3: timer settings (optional)
+  /// durationSec: 10
+  final int durationSec;
+
+  /// Optional timestamps
   final DateTime? createdAt;
   final DateTime? startedAt;
 
@@ -43,6 +46,7 @@ class BattleLobby {
     required this.answers,
     required this.locked,
     required this.scores,
+    required this.durationSec,
     required this.createdAt,
     required this.startedAt,
   });
@@ -59,17 +63,25 @@ class BattleLobby {
     final qRaw = (data['questions'] as List?) ?? const [];
     final questions = qRaw.map((e) => e.toString()).toList();
 
-    // ✅ options
-    final optRaw = (data['options'] as Map?) ?? const {};
+    // options
+    final oRaw = (data['options'] as Map?) ?? const {};
     final options = <String, List<String>>{};
-    optRaw.forEach((k, v) {
-      final list = (v as List?) ?? const [];
-      options[k.toString()] = list.map((e) => e.toString()).toList();
+    oRaw.forEach((k, v) {
+      if (v is List) {
+        options[k.toString()] = v.map((e) => e.toString()).toList();
+      }
     });
 
-    // answers + locked
-    final answers = Map<String, dynamic>.from((data['answers'] as Map?) ?? {});
-    final locked = Map<String, dynamic>.from((data['locked'] as Map?) ?? {});
+    // answers (map)
+    final aRaw = (data['answers'] as Map?) ?? const {};
+    final answers = Map<String, dynamic>.from(aRaw);
+
+    // locked (map)
+    final lRaw = (data['locked'] as Map?) ?? const {};
+    final locked = <String, bool>{};
+    lRaw.forEach((k, v) {
+      locked[k.toString()] = v == true;
+    });
 
     // scores
     final sRaw = (data['scores'] as Map?) ?? const {};
@@ -89,6 +101,7 @@ class BattleLobby {
       answers: answers,
       locked: locked,
       scores: scores,
+      durationSec: (data['durationSec'] ?? 10) as int,
       createdAt: _ts(data['createdAt']),
       startedAt: _ts(data['startedAt']),
     );
