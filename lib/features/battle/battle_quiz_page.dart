@@ -26,39 +26,64 @@ class BattleQuizPage extends ConsumerStatefulWidget {
 class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
   final BattleLobbyService _service = BattleLobbyService();
 
-  // Local UI state per question index
+  // local UI state per question
   String? _mySelected;
   bool _submitted = false;
 
-  // Basic timer (Phase 3 will replace with synced server-based timer)
-  Timer? _tick;
-  int _remaining = 10;
+  // server time sync
+  Duration _serverOffset = Duration.zero;
+  bool _offsetReady = false;
+
+  // repaint ticker (does NOT run game logic; only triggers UI refresh)
+  Timer? _uiTick;
+
   int _lastIndexSeen = -1;
+  bool _forcedLockThisIndex = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Get server offset once
+    Future.microtask(() async {
+      final off = await _service.getServerTimeOffset();
+      if (!mounted) return;
+      setState(() {
+        _serverOffset = off;
+        _offsetReady = true;
+      });
+    });
+
+    // repaint often for smooth timer; cheap (just setState)
+    _uiTick = Timer.periodic(const Duration(milliseconds: 200), (_) {
+      if (!mounted) return;
+      setState(() {});
+    });
+  }
 
   @override
   void dispose() {
-    _tick?.cancel();
+    _uiTick?.cancel();
     super.dispose();
   }
 
-  void _resetForIndex(int idx, int durationSec) {
+  DateTime _serverNow() => DateTime.now().add(_serverOffset);
+
+  int _remainingForLobby(BattleLobby lobby) {
+    final startedAt = lobby.questionStartedAt;
+    final total = lobby.timerSeconds; // <-- make sure model exposes timerSeconds
+    if (startedAt == null) return total;
+
+    final elapsed = _serverNow().difference(startedAt).inMilliseconds;
+    final remainingMs = (total * 1000) - elapsed;
+    final rem = (remainingMs / 1000).ceil();
+    return rem.clamp(0, total);
+  }
+
+  void _resetForIndex(int idx) {
     _mySelected = null;
     _submitted = false;
-
-    _tick?.cancel();
-    _remaining = durationSec;
-
-    _tick = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) return;
-      setState(() {
-        _remaining -= 1;
-        if (_remaining <= 0) {
-          _remaining = 0;
-          t.cancel();
-          // If time ends and user didn't answer, do nothing for now (phase 3 can auto-submit)
-        }
-      });
-    });
+    _forcedLockThisIndex = false;
   }
 
   @override
@@ -97,169 +122,155 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
 
     if (lobby.status != 'started' && lobby.status != 'finished') {
       return const Center(
-        child: Text('Waiting for host to start…',
-            style: TextStyle(color: Colors.white)),
+        child: Text('Waiting for host to start…', style: TextStyle(color: Colors.white)),
+      );
+    }
+
+    if (!_offsetReady) {
+      return const Center(
+        child: Text('Syncing time…', style: TextStyle(color: Colors.white70)),
       );
     }
 
     if (lobby.status == 'finished') {
       return const Center(
-        child:
-            Text('Battle finished.', style: TextStyle(color: Colors.white)),
+        child: Text('Battle finished.', style: TextStyle(color: Colors.white)),
       );
     }
 
     final idx = lobby.currentIndex;
-    final durationSec = lobby.durationSec;
 
     if (idx != _lastIndexSeen) {
       _lastIndexSeen = idx;
-      _resetForIndex(idx, durationSec);
+      _resetForIndex(idx);
     }
 
     if (idx < 0 || idx >= lobby.questions.length) {
       return const Center(
-        child: Text('Invalid question index.',
-            style: TextStyle(color: Colors.white)),
+        child: Text('Invalid question index.', style: TextStyle(color: Colors.white)),
       );
     }
 
     final term = lobby.questions[idx];
 
-    // 🔒 Locked status from Firestore (both answered)
+    // locked status
     final locked = lobby.locked['$idx'] == true;
 
-    // Answers map for this index
-    final answersForIndex =
-        (lobby.answers['$idx'] as Map?)?.cast<String, dynamic>() ?? {};
-
-    final myAnswerMap =
-        (answersForIndex[widget.userId] as Map?)?.cast<String, dynamic>();
+    // answers for index
+    final answersForIndex = (lobby.answers['$idx'] as Map?)?.cast<String, dynamic>() ?? {};
+    final myAnswerMap = (answersForIndex[widget.userId] as Map?)?.cast<String, dynamic>();
     final myAnswer = myAnswerMap?['selected']?.toString();
 
-    final opponentId = (lobby.hostId == widget.userId)
-        ? (lobby.guestId ?? '')
-        : lobby.hostId;
-
-    final oppAnswerMap =
-        (answersForIndex[opponentId] as Map?)?.cast<String, dynamic>();
+    final opponentId = (lobby.hostId == widget.userId) ? (lobby.guestId ?? '') : lobby.hostId;
+    final oppAnswerMap = (answersForIndex[opponentId] as Map?)?.cast<String, dynamic>();
     final oppAnswered = oppAnswerMap != null;
 
-    // Reveal when I answered OR locked
+    // reveal when I answered OR locked
     final reveal = myAnswer != null || locked;
 
-    // Scores
+    // scores
     final hostScore = lobby.scores[lobby.hostId] ?? 0;
-    final guestScore =
-        (lobby.guestId == null) ? 0 : (lobby.scores[lobby.guestId!] ?? 0);
+    final guestScore = (lobby.guestId == null) ? 0 : (lobby.scores[lobby.guestId!] ?? 0);
+
+    // remaining time (server-based)
+    final remaining = _remainingForLobby(lobby);
+
+    // If time is up and not locked yet, force lock ONCE (so the game advances consistently)
+    if (remaining <= 0 && !locked && !_forcedLockThisIndex) {
+      _forcedLockThisIndex = true;
+      Future.microtask(() async {
+        await _service.forceLockIfTimeUp(rawCode: widget.code, index: idx);
+      });
+    }
 
     return ref.watch(slangListProvider).when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(
-            child: Text('Error: $e', style: const TextStyle(color: Colors.white)),
-          ),
-          data: (slangs) {
-            final entry = _findEntry(slangs, term);
-            final correctAnswer = entry.meaning.trim();
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(
+        child: Text('Error: $e', style: const TextStyle(color: Colors.white)),
+      ),
+      data: (slangs) {
+        final entry = _findEntry(slangs, term);
+        final correctAnswer = entry.meaning.trim();
 
-            // ✅ MUST come from lobby.options to prevent jumbling
-            final options = lobby.options['$idx'];
+        // MUST come from lobby.options (frozen) to prevent jumbling
+        final options = lobby.options['$idx'];
 
-            if (options == null || options.length < 4) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _topRow(hostScore: hostScore, guestScore: guestScore),
-                  const SizedBox(height: 12),
-                  _banner(text: 'Preparing options…', icon: Icons.hourglass_top),
-                  const SizedBox(height: 16),
-                  _questionCard(idx: idx, total: lobby.questions.length, entry: entry),
-                  const Spacer(),
-                  const Center(child: CircularProgressIndicator()),
-                ],
-              );
-            }
+        if (options == null || options.length < 4) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _topRow(hostScore: hostScore, guestScore: guestScore),
+              const SizedBox(height: 12),
+              _banner(text: 'Preparing options…', icon: Icons.hourglass_top),
+              const SizedBox(height: 16),
+              _questionCard(idx: idx, total: lobby.questions.length, entry: entry),
+              const Spacer(),
+              const Center(child: CircularProgressIndicator()),
+            ],
+          );
+        }
 
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _topRow(hostScore: hostScore, guestScore: guestScore),
+            const SizedBox(height: 12),
+
+            Row(
               children: [
-                // ✅ Score row (restored old style)
-                _topRow(hostScore: hostScore, guestScore: guestScore),
-
-                const SizedBox(height: 12),
-
-                // Timer + status
-                Row(
-                  children: [
-                    _pill(
-                      icon: Icons.timer_rounded,
-                      text: '${_remaining}s',
-                      tone: _remaining <= 3 ? Colors.redAccent : Colors.white,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: locked
-                          ? _banner(
-                              text: 'Locked 🔒 both answered',
-                              icon: Icons.lock_rounded,
-                            )
-                          : (oppAnswered
-                              ? _banner(
-                                  text: 'Opponent answered ✅',
-                                  icon: Icons.check_circle_rounded,
-                                )
-                              : _banner(
-                                  text: 'Waiting for opponent…',
-                                  icon: Icons.person_outline,
-                                )),
-                    ),
-                  ],
+                _pill(
+                  icon: Icons.timer_rounded,
+                  text: '${remaining}s',
+                  tone: remaining <= 3 ? Colors.redAccent : Colors.white,
                 ),
-
-                const SizedBox(height: 14),
-
-                _questionCard(idx: idx, total: lobby.questions.length, entry: entry),
-
-                const SizedBox(height: 12),
-
-                // ✅ Options (restored highlight behavior)
-                for (final opt in options) ...[
-                  const SizedBox(height: 10),
-                  _optionTile(
-                    opt: opt,
-                    correct: correctAnswer,
-                    myAnswer: myAnswer,
-                    reveal: reveal,
-                    locked: locked,
-                    onTap: (locked || _submitted)
-                        ? null
-                        : () async {
-                            setState(() {
-                              _mySelected = opt;
-                              _submitted = true;
-                            });
-
-                            final isCorrect =
-                                opt.trim() == correctAnswer.trim();
-
-                            await _service.submitAnswer(
-                              rawCode: widget.code,
-                              userId: widget.userId,
-                              index: idx,
-                              selected: opt,
-                              correctAnswer: correctAnswer,
-                            );
-                          },
-                  ),
-                ],
-
-                const Spacer(),
-
-                // No “correct answer” shown anywhere — this fixes your bug #1
+                const SizedBox(width: 10),
+                Expanded(
+                  child: locked
+                      ? _banner(text: 'Locked 🔒 both answered', icon: Icons.lock_rounded)
+                      : (oppAnswered
+                          ? _banner(text: 'Opponent answered ✅', icon: Icons.check_circle_rounded)
+                          : _banner(text: 'Waiting for opponent…', icon: Icons.person_outline)),
+                ),
               ],
-            );
-          },
+            ),
+
+            const SizedBox(height: 14),
+            _questionCard(idx: idx, total: lobby.questions.length, entry: entry),
+            const SizedBox(height: 12),
+
+            for (final opt in options) ...[
+              const SizedBox(height: 10),
+              _optionTile(
+                opt: opt,
+                correct: correctAnswer,
+                myAnswer: myAnswer,
+                reveal: reveal,
+                locked: locked,
+                onTap: (locked || _submitted || remaining <= 0)
+                    ? null
+                    : () async {
+                        setState(() {
+                          _mySelected = opt;
+                          _submitted = true;
+                        });
+
+                        await _service.submitAnswer(
+                          rawCode: widget.code,
+                          userId: widget.userId,
+                          index: idx,
+                          selected: opt,
+                          correctAnswer: correctAnswer,
+                        );
+                      },
+              ),
+            ],
+
+            const Spacer(),
+            // no pre-reveal correct answer
+          ],
         );
+      },
+    );
   }
 
   SlangEntry _findEntry(List<SlangEntry> slangs, String term) {
@@ -362,8 +373,7 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
                 ),
               ),
             ),
-            if (locked)
-              const Icon(Icons.lock_rounded, color: Colors.white70, size: 18),
+            if (locked) const Icon(Icons.lock_rounded, color: Colors.white70, size: 18),
           ],
         ),
       ),
@@ -408,16 +418,12 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
         children: [
           Icon(icon, color: tone, size: 18),
           const SizedBox(width: 8),
-          Text(
-            text,
-            style: TextStyle(color: tone, fontWeight: FontWeight.w900),
-          ),
+          Text(text, style: TextStyle(color: tone, fontWeight: FontWeight.w900)),
         ],
       ),
     );
   }
 
-  // ✅ Restored score UI (your old style)
   static Widget _scoreCard({required String label, required int score}) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -428,21 +434,24 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
       ),
       child: Row(
         children: [
-          Text(label,
-              style: const TextStyle(
-                  color: Colors.white70, fontWeight: FontWeight.w800)),
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800),
+          ),
           const Spacer(),
-          Text('$score',
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 18)),
+          Text(
+            '$score',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 18,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  // ✅ Restored option highlight logic
   _OptionVisualState _optionState({
     required String opt,
     required String correct,

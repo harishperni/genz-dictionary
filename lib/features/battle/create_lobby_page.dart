@@ -62,7 +62,8 @@ class _CreateLobbyPageState extends ConsumerState<CreateLobbyPage> {
         if (!mounted || lobby == null) return;
         setState(() => _lobby = lobby);
 
-        // when started -> go quiz
+        // ✅ Navigate when started
+        // Timer sync is handled in BattleQuizPage using lobby.battleStartsAt/questionStartedAt
         if (lobby.status == 'started') {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
@@ -94,6 +95,9 @@ class _CreateLobbyPageState extends ConsumerState<CreateLobbyPage> {
       final slangList = await ref.read(slangListProvider.future);
       final termToMeaning = {for (final s in slangList) s.term: s.meaning};
 
+      // ✅ IMPORTANT:
+      // startBattle() should write battleStartsAt + questionStartedAt using SERVER-SYNCED time.
+      // (You’ll update BattleLobbyService.startBattle accordingly.)
       await _service.startBattle(
         rawCode: code,
         termToMeaning: termToMeaning,

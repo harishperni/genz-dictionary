@@ -20,8 +20,8 @@ class BattleLobbyService {
     return List.generate(6, (_) => chars[r.nextInt(chars.length)]).join();
   }
 
-  /// ✅ Estimate server clock offset so all devices use the same "now"
-  /// Returns: serverNow - localNow (Duration)
+  /// ✅ Estimate server clock offset so all devices can align to server-based time.
+  /// Returns: (serverNow - localNow)
   Future<Duration> getServerTimeOffset() async {
     final ref = _db.collection(_collection).doc('_time_sync');
 
@@ -69,15 +69,18 @@ class BattleLobbyService {
         'startedAt': null,
 
         // Phase 2+ fields
-        'answers': {},
-        'locked': {},
+        'answers': {}, // index -> uid -> {selected, correct, at}
+        'locked': {},  // index -> true
 
-        // frozen options per index
-        'options': {},
+        // frozen options for the whole game
+        'options': {}, // index -> [4 options]
 
-        // timer fields
+        // timer
         'timerSeconds': 10,
         'questionStartedAt': null,
+
+        // sync start
+        'battleStartsAt': null,
       });
 
       return code;
@@ -99,10 +102,10 @@ class BattleLobbyService {
 
       final data = snap.data() ?? {};
       final status = (data['status'] ?? 'waiting') as String;
-
       final hostId = (data['hostId'] ?? '') as String;
       final guestId = data['guestId'] as String?;
 
+      // can't join if already started/finished
       if (status == 'started' || status == 'finished') return false;
 
       // SAFE JOIN: block if someone else already joined
@@ -123,16 +126,23 @@ class BattleLobbyService {
   }
 
   /// Host starts battle (active -> started)
-  /// Also freezes options for ALL questions once.
+  /// ✅ Freezes options for ALL questions once.
+  /// ✅ Sets a single shared battleStartsAt so both phones start together.
   Future<void> startBattle({
     required String rawCode,
     required Map<String, String> termToMeaning,
     int timerSeconds = 10,
+    int startDelayMs = 900, // small buffer so both devices can navigate + start together
   }) async {
     final code = normalizeCode(rawCode);
     if (code.isEmpty) throw Exception('Invalid lobby code.');
 
     final ref = _ref(code);
+
+    // Host computes a server-synced start time
+    final offset = await getServerTimeOffset();
+    final serverNowApprox = DateTime.now().add(offset);
+    final battleStartsAt = serverNowApprox.add(Duration(milliseconds: startDelayMs));
 
     await _db.runTransaction((tx) async {
       final snap = await tx.get(ref);
@@ -155,25 +165,39 @@ class BattleLobbyService {
         throw Exception('No questions in lobby.');
       }
 
-      // scores reset
+      // reset scores
       final scores = <String, dynamic>{hostId: 0, guestId: 0};
 
       // ✅ Build & freeze options for ALL questions once
       final options = <String, dynamic>{};
+
+      // pool of meanings for wrong answers
+      final allMeanings = termToMeaning.values
+          .map((m) => m.trim())
+          .where((m) => m.isNotEmpty)
+          .toList();
+
       for (int i = 0; i < questions.length; i++) {
         final term = questions[i];
-        final correct = termToMeaning[term] ?? '';
+        final correct = (termToMeaning[term] ?? '').trim();
 
-        // build 3 random wrong meanings + correct
-        final wrongPool = termToMeaning.values
-            .where((m) => m.trim().isNotEmpty && m.trim() != correct.trim())
-            .toList();
+        // Build wrong pool excluding correct
+        final wrongPool = allMeanings.where((m) => m != correct).toList()..shuffle();
 
-        wrongPool.shuffle();
-        final wrongs = wrongPool.take(3).toList();
+        final wrongs = <String>[];
+        for (final w in wrongPool) {
+          if (wrongs.length >= 3) break;
+          if (!wrongs.contains(w)) wrongs.add(w);
+        }
 
-        final list = <String>[correct, ...wrongs];
+        // If pool is too small, pad (keeps UI from breaking)
+        while (wrongs.length < 3) {
+          wrongs.add('Not sure 🤔');
+        }
+
+        final list = <String>[correct.isEmpty ? 'Unknown' : correct, ...wrongs];
         list.shuffle();
+
         options['$i'] = list;
       }
 
@@ -186,10 +210,13 @@ class BattleLobbyService {
         'answers': {},
         'locked': {},
 
-        'options': options, // ✅ frozen for whole game
+        'options': options,
 
         'timerSeconds': timerSeconds,
-        'questionStartedAt': FieldValue.serverTimestamp(), // ✅ start timer now
+
+        // ✅ shared sync fields
+        'battleStartsAt': Timestamp.fromDate(battleStartsAt),
+        'questionStartedAt': Timestamp.fromDate(battleStartsAt),
       });
     });
   }
@@ -219,6 +246,7 @@ class BattleLobbyService {
 
       final hostId = (data['hostId'] ?? '') as String;
       final guestId = (data['guestId'] ?? '') as String;
+
       final questions = (data['questions'] as List? ?? const [])
           .map((e) => e.toString())
           .toList();
@@ -233,11 +261,11 @@ class BattleLobbyService {
           Map<String, dynamic>.from((answers['$index'] as Map?) ?? {});
       final alreadyAnswered = existingForIndex.containsKey(userId);
 
-      final correct = selected.trim() == correctAnswer.trim();
+      final isCorrect = selected.trim() == correctAnswer.trim();
 
       existingForIndex[userId] = {
         'selected': selected,
-        'correct': correct,
+        'correct': isCorrect,
         'at': FieldValue.serverTimestamp(),
       };
       answers['$index'] = existingForIndex;
@@ -246,7 +274,7 @@ class BattleLobbyService {
       scores.putIfAbsent(hostId, () => 0);
       if (guestId.isNotEmpty) scores.putIfAbsent(guestId, () => 0);
 
-      if (!alreadyAnswered && correct == true) {
+      if (!alreadyAnswered && isCorrect) {
         final cur = (scores[userId] ?? 0) as int;
         scores[userId] = cur + 1;
       }
@@ -272,7 +300,7 @@ class BattleLobbyService {
             updates['status'] = 'finished';
           } else {
             updates['currentIndex'] = next;
-            updates['questionStartedAt'] = FieldValue.serverTimestamp(); // reset timer
+            updates['questionStartedAt'] = FieldValue.serverTimestamp();
           }
         }
       }
@@ -281,8 +309,8 @@ class BattleLobbyService {
     });
   }
 
-  /// If timer ends: mark user as wrong/no-answer (optional), or just auto-advance after both timed out.
-  /// We'll keep it simple: allow quiz page to call this to "force lock" when time is up.
+  /// Called when timer hits 0 (from UI)
+  /// Locks this index and auto-advances (no score changes).
   Future<void> forceLockIfTimeUp({
     required String rawCode,
     required int index,
@@ -300,7 +328,6 @@ class BattleLobbyService {
       final locked = Map<String, dynamic>.from((data['locked'] as Map?) ?? {});
       if (locked['$index'] == true) return;
 
-      // Just lock (no score change)
       locked['$index'] = true;
 
       final questions = (data['questions'] as List? ?? const [])
@@ -323,6 +350,34 @@ class BattleLobbyService {
       }
 
       tx.update(ref, updates);
+    });
+  }
+
+  /// Manual advance (optional fallback)
+  Future<void> advanceQuestion(String rawCode) async {
+    final code = normalizeCode(rawCode);
+    final ref = _ref(code);
+
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) throw Exception('Lobby not found.');
+
+      final data = snap.data() ?? {};
+      final status = (data['status'] ?? 'waiting') as String;
+      final questions = (data['questions'] as List? ?? []);
+      final idx = (data['currentIndex'] ?? 0) as int;
+
+      if (status != 'started') return;
+
+      final next = idx + 1;
+      if (next >= questions.length) {
+        tx.update(ref, {'status': 'finished'});
+      } else {
+        tx.update(ref, {
+          'currentIndex': next,
+          'questionStartedAt': FieldValue.serverTimestamp(),
+        });
+      }
     });
   }
 
