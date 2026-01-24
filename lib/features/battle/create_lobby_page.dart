@@ -101,7 +101,7 @@ class _CreateLobbyPageState extends ConsumerState<CreateLobbyPage> {
       await _service.startBattle(
         rawCode: code,
         termToMeaning: termToMeaning,
-        timerSeconds: 10,
+        timerSeconds: 15,
       );
     } catch (e) {
       if (!mounted) return;

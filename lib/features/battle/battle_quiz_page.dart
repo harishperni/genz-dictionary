@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../slang/app/slang_providers.dart';
 import '../slang/domain/slang_entry.dart';
@@ -27,14 +28,13 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
   final BattleLobbyService _service = BattleLobbyService();
 
   // local UI state per question
-  String? _mySelected;
   bool _submitted = false;
 
   // server time sync
   Duration _serverOffset = Duration.zero;
   bool _offsetReady = false;
 
-  // repaint ticker (does NOT run game logic; only triggers UI refresh)
+  // repaint ticker (UI only)
   Timer? _uiTick;
 
   int _lastIndexSeen = -1;
@@ -54,7 +54,7 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
       });
     });
 
-    // repaint often for smooth timer; cheap (just setState)
+    // Frequent UI repaint for timer smoothness
     _uiTick = Timer.periodic(const Duration(milliseconds: 200), (_) {
       if (!mounted) return;
       setState(() {});
@@ -69,21 +69,34 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
 
   DateTime _serverNow() => DateTime.now().add(_serverOffset);
 
+  void _resetForIndex(int idx) {
+    _submitted = false;
+    _forcedLockThisIndex = false;
+  }
+
   int _remainingForLobby(BattleLobby lobby) {
     final startedAt = lobby.questionStartedAt;
-    final total = lobby.timerSeconds; // <-- make sure model exposes timerSeconds
+    final total = lobby.timerSeconds; // ✅ 15 comes from Firestore
     if (startedAt == null) return total;
 
-    final elapsed = _serverNow().difference(startedAt).inMilliseconds;
-    final remainingMs = (total * 1000) - elapsed;
+    final elapsedMs = _serverNow().difference(startedAt).inMilliseconds;
+    final remainingMs = (total * 1000) - elapsedMs;
+
+    // ceil so it doesn’t drop early
     final rem = (remainingMs / 1000).ceil();
     return rem.clamp(0, total);
   }
 
-  void _resetForIndex(int idx) {
-    _mySelected = null;
-    _submitted = false;
-    _forcedLockThisIndex = false;
+  int _secondsUntil(DateTime target) {
+    final diffMs = target.difference(_serverNow()).inMilliseconds;
+    final s = (diffMs / 1000).ceil();
+    return s < 0 ? 0 : s;
+  }
+
+  bool _isRevealWindow(BattleLobby lobby) {
+    if (lobby.advanceAt == null) return false;
+    final due = lobby.advanceAt!.add(Duration(milliseconds: lobby.advanceDelayMs));
+    return _serverNow().isBefore(due);
   }
 
   @override
@@ -122,7 +135,10 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
 
     if (lobby.status != 'started' && lobby.status != 'finished') {
       return const Center(
-        child: Text('Waiting for host to start…', style: TextStyle(color: Colors.white)),
+        child: Text(
+          'Waiting for host to start…',
+          style: TextStyle(color: Colors.white),
+        ),
       );
     }
 
@@ -132,12 +148,128 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
       );
     }
 
+    // ✅ Finished screen: Winner + Share
     if (lobby.status == 'finished') {
-      return const Center(
-        child: Text('Battle finished.', style: TextStyle(color: Colors.white)),
+      final hostId = lobby.hostId;
+      final guestId = lobby.guestId ?? '';
+
+      final hostScore = lobby.scores[hostId] ?? 0;
+      final guestScore = guestId.isEmpty ? 0 : (lobby.scores[guestId] ?? 0);
+
+      final hostName = lobby.playerNames[hostId]?.trim().isNotEmpty == true
+          ? lobby.playerNames[hostId]!.trim()
+          : 'Host';
+
+      final guestName = lobby.playerNames[guestId]?.trim().isNotEmpty == true
+          ? lobby.playerNames[guestId]!.trim()
+          : 'Guest';
+
+      String winnerText;
+      if (hostScore == guestScore) {
+        winnerText = "It's a tie! 🤝";
+      } else if (hostScore > guestScore) {
+        winnerText = "$hostName won 🏆";
+      } else {
+        winnerText = "$guestName won 🏆";
+      }
+
+      final shareText =
+          "Battle result: $hostName ($hostScore) vs $guestName ($guestScore). $winnerText";
+
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.emoji_events_rounded, color: Colors.amber, size: 56),
+              const SizedBox(height: 14),
+              Text(
+                winnerText,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                "$hostName: $hostScore\n$guestName: $guestScore",
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.80),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 22),
+              ElevatedButton.icon(
+                onPressed: () => Share.share(shareText),
+                icon: const Icon(Icons.share_rounded),
+                label: const Text("Share with friends"),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                "Play again from Battle Menu",
+                style: TextStyle(color: Colors.white.withOpacity(0.6)),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
+    // ✅ Phase 3 START GATE — both phones wait until shared battleStartsAt
+    final startAt = lobby.battleStartsAt;
+    if (startAt != null && _serverNow().isBefore(startAt)) {
+      final secs = _secondsUntil(startAt);
+
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.sports_kabaddi_rounded, color: Colors.white, size: 44),
+          const SizedBox(height: 14),
+          const Text(
+            'Get ready…',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Starting in ${secs}s',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.80),
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            width: 220,
+            child: LinearProgressIndicator(
+              value: (1 - (secs / 5)).clamp(0.0, 1.0),
+              minHeight: 8,
+              backgroundColor: Colors.white.withOpacity(0.10),
+            ),
+          ),
+          const SizedBox(height: 26),
+          Text(
+            'Both players will start together.',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.65),
+              fontWeight: FontWeight.w700,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      );
+    }
+
+    // Normal in-game view
     final idx = lobby.currentIndex;
 
     if (idx != _lastIndexSeen) {
@@ -147,7 +279,10 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
 
     if (idx < 0 || idx >= lobby.questions.length) {
       return const Center(
-        child: Text('Invalid question index.', style: TextStyle(color: Colors.white)),
+        child: Text(
+          'Invalid question index.',
+          style: TextStyle(color: Colors.white),
+        ),
       );
     }
 
@@ -157,31 +292,53 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
     final locked = lobby.locked['$idx'] == true;
 
     // answers for index
-    final answersForIndex = (lobby.answers['$idx'] as Map?)?.cast<String, dynamic>() ?? {};
-    final myAnswerMap = (answersForIndex[widget.userId] as Map?)?.cast<String, dynamic>();
+    final answersForIndex =
+        (lobby.answers['$idx'] as Map?)?.cast<String, dynamic>() ?? {};
+
+    final myAnswerMap =
+        (answersForIndex[widget.userId] as Map?)?.cast<String, dynamic>();
     final myAnswer = myAnswerMap?['selected']?.toString();
 
-    final opponentId = (lobby.hostId == widget.userId) ? (lobby.guestId ?? '') : lobby.hostId;
-    final oppAnswerMap = (answersForIndex[opponentId] as Map?)?.cast<String, dynamic>();
+    final opponentId = (lobby.hostId == widget.userId)
+        ? (lobby.guestId ?? '')
+        : lobby.hostId;
+
+    final oppAnswerMap =
+        (answersForIndex[opponentId] as Map?)?.cast<String, dynamic>();
     final oppAnswered = oppAnswerMap != null;
 
-    // reveal when I answered OR locked
+    final bothAnswered = lobby.hostId.isNotEmpty &&
+        (lobby.guestId ?? '').isNotEmpty &&
+        answersForIndex.containsKey(lobby.hostId) &&
+        answersForIndex.containsKey(lobby.guestId);
+
+    // reveal when locked OR I answered
     final reveal = myAnswer != null || locked;
 
     // scores
     final hostScore = lobby.scores[lobby.hostId] ?? 0;
-    final guestScore = (lobby.guestId == null) ? 0 : (lobby.scores[lobby.guestId!] ?? 0);
+    final guestScore =
+        (lobby.guestId == null) ? 0 : (lobby.scores[lobby.guestId!] ?? 0);
 
     // remaining time (server-based)
     final remaining = _remainingForLobby(lobby);
 
-    // If time is up and not locked yet, force lock ONCE (so the game advances consistently)
+    // If time is up and not locked yet, force lock ONCE
     if (remaining <= 0 && !locked && !_forcedLockThisIndex) {
       _forcedLockThisIndex = true;
       Future.microtask(() async {
         await _service.forceLockIfTimeUp(rawCode: widget.code, index: idx);
       });
     }
+
+    // ✅ If locked and reveal window finished, advance (safe to call many times)
+    if (locked && lobby.advanceAt != null && !_isRevealWindow(lobby)) {
+      Future.microtask(() async {
+        await _service.advanceIfDue(rawCode: widget.code);
+      });
+    }
+
+    final isRevealing = locked && lobby.advanceAt != null && _isRevealWindow(lobby);
 
     return ref.watch(slangListProvider).when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -192,7 +349,7 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
         final entry = _findEntry(slangs, term);
         final correctAnswer = entry.meaning.trim();
 
-        // MUST come from lobby.options (frozen) to prevent jumbling
+        // frozen options
         final options = lobby.options['$idx'];
 
         if (options == null || options.length < 4) {
@@ -210,12 +367,32 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
           );
         }
 
+        // status banner logic
+        Widget statusBanner;
+        if (locked) {
+          statusBanner = _banner(
+            text: bothAnswered
+                ? (isRevealing ? 'Showing results…' : 'Locked 🔒')
+                : (isRevealing ? 'Time up — showing results…' : 'Locked 🔒 time up'),
+            icon: Icons.lock_rounded,
+          );
+        } else if (oppAnswered) {
+          statusBanner = _banner(
+            text: 'Opponent answered ✅',
+            icon: Icons.check_circle_rounded,
+          );
+        } else {
+          statusBanner = _banner(
+            text: 'Waiting for opponent…',
+            icon: Icons.person_outline,
+          );
+        }
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _topRow(hostScore: hostScore, guestScore: guestScore),
             const SizedBox(height: 12),
-
             Row(
               children: [
                 _pill(
@@ -224,16 +401,9 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
                   tone: remaining <= 3 ? Colors.redAccent : Colors.white,
                 ),
                 const SizedBox(width: 10),
-                Expanded(
-                  child: locked
-                      ? _banner(text: 'Locked 🔒 both answered', icon: Icons.lock_rounded)
-                      : (oppAnswered
-                          ? _banner(text: 'Opponent answered ✅', icon: Icons.check_circle_rounded)
-                          : _banner(text: 'Waiting for opponent…', icon: Icons.person_outline)),
-                ),
+                Expanded(child: statusBanner),
               ],
             ),
-
             const SizedBox(height: 14),
             _questionCard(idx: idx, total: lobby.questions.length, entry: entry),
             const SizedBox(height: 12),
@@ -244,13 +414,12 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
                 opt: opt,
                 correct: correctAnswer,
                 myAnswer: myAnswer,
-                reveal: reveal,
+                reveal: reveal, // ✅ locked triggers reveal for both
                 locked: locked,
-                onTap: (locked || _submitted || remaining <= 0)
+                onTap: (locked || isRevealing || _submitted || remaining <= 0)
                     ? null
                     : () async {
                         setState(() {
-                          _mySelected = opt;
                           _submitted = true;
                         });
 
@@ -266,7 +435,6 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
             ],
 
             const Spacer(),
-            // no pre-reveal correct answer
           ],
         );
       },
@@ -373,7 +541,8 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
                 ),
               ),
             ),
-            if (locked) const Icon(Icons.lock_rounded, color: Colors.white70, size: 18),
+            if (locked)
+              const Icon(Icons.lock_rounded, color: Colors.white70, size: 18),
           ],
         ),
       ),

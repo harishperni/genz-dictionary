@@ -6,6 +6,9 @@ class BattleLobbyService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   static const String _collection = 'battle_lobbies';
 
+  // ✅ reveal delay before moving to next question
+  static const int _advanceDelayMs = 2500;
+
   DocumentReference<Map<String, dynamic>> _ref(String code) =>
       _db.collection(_collection).doc(code);
 
@@ -44,9 +47,11 @@ class BattleLobbyService {
   }
 
   /// Host creates lobby (status=waiting)
+  /// displayName is optional so your existing calls won't break.
   Future<String> createLobby({
     required String userId,
     required List<String> questions,
+    String? displayName,
   }) async {
     final q = List<String>.from(questions);
     if (q.length > 10) q.removeRange(10, q.length);
@@ -70,17 +75,24 @@ class BattleLobbyService {
 
         // Phase 2+ fields
         'answers': {}, // index -> uid -> {selected, correct, at}
-        'locked': {},  // index -> true
+        'locked': {}, // index -> true
 
         // frozen options for the whole game
         'options': {}, // index -> [4 options]
 
-        // timer
-        'timerSeconds': 10,
+        // timer (✅ 15s default)
+        'timerSeconds': 15,
         'questionStartedAt': null,
 
         // sync start
         'battleStartsAt': null,
+
+        // reveal/advance
+        'advanceAt': null,
+        'advanceDelayMs': _advanceDelayMs,
+
+        // winner names (fallback)
+        'playerNames': {userId: (displayName?.trim().isNotEmpty == true) ? displayName!.trim() : 'Host'},
       });
 
       return code;
@@ -90,7 +102,8 @@ class BattleLobbyService {
   }
 
   /// Guest joins lobby (waiting/active) -> sets guestId + status=active
-  Future<bool> joinLobby(String rawCode, String userId) async {
+  /// displayName is optional so your existing calls won't break.
+  Future<bool> joinLobby(String rawCode, String userId, {String? displayName}) async {
     final code = normalizeCode(rawCode);
     if (code.isEmpty) return false;
 
@@ -115,10 +128,15 @@ class BattleLobbyService {
       scores.putIfAbsent(hostId, () => 0);
       scores.putIfAbsent(userId, () => 0);
 
+      final playerNames = Map<String, dynamic>.from((data['playerNames'] as Map?) ?? {});
+      playerNames.putIfAbsent(hostId, () => 'Host');
+      playerNames[userId] = (displayName?.trim().isNotEmpty == true) ? displayName!.trim() : 'Guest';
+
       tx.update(ref, {
         'guestId': userId,
         'status': 'active',
         'scores': scores,
+        'playerNames': playerNames,
       });
 
       return true;
@@ -131,8 +149,8 @@ class BattleLobbyService {
   Future<void> startBattle({
     required String rawCode,
     required Map<String, String> termToMeaning,
-    int timerSeconds = 10,
-    int startDelayMs = 900, // small buffer so both devices can navigate + start together
+    int timerSeconds = 15, // ✅ 15s
+    int startDelayMs = 900, // buffer so both devices navigate + start together
   }) async {
     final code = normalizeCode(rawCode);
     if (code.isEmpty) throw Exception('Invalid lobby code.');
@@ -168,7 +186,7 @@ class BattleLobbyService {
       // reset scores
       final scores = <String, dynamic>{hostId: 0, guestId: 0};
 
-      // ✅ Build & freeze options for ALL questions once
+      // Build & freeze options for ALL questions once
       final options = <String, dynamic>{};
 
       // pool of meanings for wrong answers
@@ -181,7 +199,6 @@ class BattleLobbyService {
         final term = questions[i];
         final correct = (termToMeaning[term] ?? '').trim();
 
-        // Build wrong pool excluding correct
         final wrongPool = allMeanings.where((m) => m != correct).toList()..shuffle();
 
         final wrongs = <String>[];
@@ -190,7 +207,6 @@ class BattleLobbyService {
           if (!wrongs.contains(w)) wrongs.add(w);
         }
 
-        // If pool is too small, pad (keeps UI from breaking)
         while (wrongs.length < 3) {
           wrongs.add('Not sure 🤔');
         }
@@ -200,6 +216,11 @@ class BattleLobbyService {
 
         options['$i'] = list;
       }
+
+      // ensure playerNames exists
+      final playerNames = Map<String, dynamic>.from((data['playerNames'] as Map?) ?? {});
+      playerNames.putIfAbsent(hostId, () => 'Host');
+      playerNames.putIfAbsent(guestId, () => 'Guest');
 
       tx.update(ref, {
         'status': 'started',
@@ -214,9 +235,15 @@ class BattleLobbyService {
 
         'timerSeconds': timerSeconds,
 
-        // ✅ shared sync fields
+        // shared sync fields
         'battleStartsAt': Timestamp.fromDate(battleStartsAt),
         'questionStartedAt': Timestamp.fromDate(battleStartsAt),
+
+        // reveal/advance
+        'advanceAt': null,
+        'advanceDelayMs': _advanceDelayMs,
+
+        'playerNames': playerNames,
       });
     });
   }
@@ -225,7 +252,8 @@ class BattleLobbyService {
   /// - saves answers[index][uid]
   /// - increments score once if correct
   /// - locks when both answered
-  /// - auto-advances when both answered ✅
+  /// - ✅ DOES NOT auto-advance immediately
+  /// - ✅ sets advanceAt so both can see red/green for ~2.5s
   Future<void> submitAnswer({
     required String rawCode,
     required String userId,
@@ -246,11 +274,6 @@ class BattleLobbyService {
 
       final hostId = (data['hostId'] ?? '') as String;
       final guestId = (data['guestId'] ?? '') as String;
-
-      final questions = (data['questions'] as List? ?? const [])
-          .map((e) => e.toString())
-          .toList();
-      final currentIndex = (data['currentIndex'] ?? 0) as int;
 
       final answers = Map<String, dynamic>.from((data['answers'] as Map?) ?? {});
       final locked = Map<String, dynamic>.from((data['locked'] as Map?) ?? {});
@@ -293,16 +316,9 @@ class BattleLobbyService {
         locked['$index'] = true;
         updates['locked'] = locked;
 
-        // ✅ AUTO-ADVANCE only if this is the current question
-        if (index == currentIndex) {
-          final next = currentIndex + 1;
-          if (next >= questions.length) {
-            updates['status'] = 'finished';
-          } else {
-            updates['currentIndex'] = next;
-            updates['questionStartedAt'] = FieldValue.serverTimestamp();
-          }
-        }
+        // ✅ start reveal window now (server time)
+        updates['advanceAt'] = FieldValue.serverTimestamp();
+        updates['advanceDelayMs'] = _advanceDelayMs;
       }
 
       tx.update(ref, updates);
@@ -310,7 +326,7 @@ class BattleLobbyService {
   }
 
   /// Called when timer hits 0 (from UI)
-  /// Locks this index and auto-advances (no score changes).
+  /// Locks this index and schedules advance after reveal window.
   Future<void> forceLockIfTimeUp({
     required String rawCode,
     required int index,
@@ -330,57 +346,58 @@ class BattleLobbyService {
 
       locked['$index'] = true;
 
-      final questions = (data['questions'] as List? ?? const [])
-          .map((e) => e.toString())
-          .toList();
-      final currentIndex = (data['currentIndex'] ?? 0) as int;
-
-      final updates = <String, dynamic>{
+      tx.update(ref, {
         'locked': locked,
-      };
-
-      if (index == currentIndex) {
-        final next = currentIndex + 1;
-        if (next >= questions.length) {
-          updates['status'] = 'finished';
-        } else {
-          updates['currentIndex'] = next;
-          updates['questionStartedAt'] = FieldValue.serverTimestamp();
-        }
-      }
-
-      tx.update(ref, updates);
+        'advanceAt': FieldValue.serverTimestamp(),
+        'advanceDelayMs': _advanceDelayMs,
+      });
     });
   }
 
-  /// Manual advance (optional fallback)
-  Future<void> advanceQuestion(String rawCode) async {
+  /// ✅ Advance when reveal window is complete.
+  /// Safe to call from either phone many times.
+  Future<void> advanceIfDue({required String rawCode}) async {
     final code = normalizeCode(rawCode);
     final ref = _ref(code);
 
     await _db.runTransaction((tx) async {
       final snap = await tx.get(ref);
-      if (!snap.exists) throw Exception('Lobby not found.');
+      if (!snap.exists) return;
 
       final data = snap.data() ?? {};
-      final status = (data['status'] ?? 'waiting') as String;
-      final questions = (data['questions'] as List? ?? []);
+      if ((data['status'] ?? '') != 'started') return;
+
+      final advanceAtTs = data['advanceAt'] as Timestamp?;
+      if (advanceAtTs == null) return;
+
+      final delayMs = (data['advanceDelayMs'] ?? _advanceDelayMs) as int;
+
+      final dueAt = advanceAtTs.toDate().add(Duration(milliseconds: delayMs));
+      final now = DateTime.now(); // device time; ok because dueAt is server-based
+      if (now.isBefore(dueAt)) return;
+
+      final questions = (data['questions'] as List? ?? const [])
+          .map((e) => e.toString())
+          .toList();
+
       final idx = (data['currentIndex'] ?? 0) as int;
-
-      if (status != 'started') return;
-
       final next = idx + 1;
+
       if (next >= questions.length) {
-        tx.update(ref, {'status': 'finished'});
+        tx.update(ref, {
+          'status': 'finished',
+          'advanceAt': null,
+        });
       } else {
         tx.update(ref, {
           'currentIndex': next,
           'questionStartedAt': FieldValue.serverTimestamp(),
+          'advanceAt': null,
         });
       }
     });
   }
-  ///comments
+
   Stream<BattleLobby?> watchLobby(String rawCode) {
     final code = normalizeCode(rawCode);
     return _ref(code).snapshots().map((doc) {
