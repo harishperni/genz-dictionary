@@ -380,7 +380,7 @@ class BattleLobbyService {
       }
     });
   }
-
+  ///comments
   Stream<BattleLobby?> watchLobby(String rawCode) {
     final code = normalizeCode(rawCode);
     return _ref(code).snapshots().map((doc) {
