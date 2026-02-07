@@ -136,7 +136,7 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
     }
 
     // ✅ Finished screen with winner + share/copy
-    if (lobby.status == 'finished') {
+        if (lobby.status == 'finished') {
       final hostScore = lobby.scores[lobby.hostId] ?? 0;
       final guestScore =
           (lobby.guestId == null) ? 0 : (lobby.scores[lobby.guestId!] ?? 0);
@@ -168,27 +168,104 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(resultText,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 22)),
+              Text(
+                resultText,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 22,
+                ),
+              ),
               const SizedBox(height: 12),
-              Text('Host: $hostScore   •   Guest: $guestScore',
-                  style: TextStyle(
-                      color: Colors.white.withOpacity(0.85),
-                      fontWeight: FontWeight.w700)),
+              Text(
+                'Host: $hostScore   •   Guest: $guestScore',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.85),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               const SizedBox(height: 18),
-              ElevatedButton.icon(
-                onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: shareText));
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Copied result to clipboard ✅')),
-                  );
-                },
-                icon: const Icon(Icons.share_rounded),
-                label: const Text('Share / Copy Result'),
+
+              // ✅ Share / Copy
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: shareText));
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Copied result to clipboard ✅')),
+                    );
+                  },
+                  icon: const Icon(Icons.share_rounded),
+                  label: const Text('Share / Copy Result'),
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              // ✅ Rematch (Host only)
+              if (isHostMe)
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      try {
+                        // 1) pull slang list to pick new questions
+                        final slangs = await ref.read(slangListProvider.future);
+                        final terms = slangs.map((e) => e.term).toList()..shuffle();
+                        final newQuestions = terms.take(10).toList();
+
+                        // 2) reset lobby to active with new questions
+                        await _service.prepareRematch(
+                          rawCode: widget.code,
+                          hostUserId: widget.userId,
+                          newQuestions: newQuestions,
+                        );
+
+                        // 3) start battle again (same guest, same code)
+                        final termToMeaning = {for (final s in slangs) s.term: s.meaning};
+
+                        await _service.startBattle(
+                          rawCode: widget.code,
+                          termToMeaning: termToMeaning,
+                          timerSeconds: 15,
+                        );
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Rematch failed: $e')),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.replay_rounded),
+                    label: const Text('Rematch (Play Again)'),
+                  ),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Waiting for host to start a rematch…',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.70),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+
+              const SizedBox(height: 10),
+
+              // ✅ Back
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  label: const Text('Back'),
+                ),
               ),
             ],
           ),

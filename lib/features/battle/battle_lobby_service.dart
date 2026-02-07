@@ -359,6 +359,58 @@ class BattleLobbyService {
       }
     });
   }
+    /// ✅ Rematch (host only)
+  /// Resets the lobby back to "active" with fresh questions,
+  /// clears answers/locks/options, resets scores, then host can call startBattle().
+  Future<void> prepareRematch({
+    required String rawCode,
+    required String hostUserId,
+    required List<String> newQuestions,
+  }) async {
+    final code = normalizeCode(rawCode);
+    final ref = _ref(code);
+
+    final q = List<String>.from(newQuestions);
+    if (q.length > 10) q.removeRange(10, q.length);
+
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) throw Exception('Lobby not found.');
+
+      final data = snap.data() ?? {};
+      final status = (data['status'] ?? 'waiting') as String;
+      final hostId = (data['hostId'] ?? '') as String;
+      final guestId = (data['guestId'] ?? '') as String;
+
+      if (hostId != hostUserId) {
+        throw Exception('Only host can start a rematch.');
+      }
+
+      if (status != 'finished') {
+        throw Exception('Rematch is only available after the match finishes.');
+      }
+
+      if (guestId.isEmpty) {
+        throw Exception('No guest in lobby.');
+      }
+
+      // reset scores + state
+      tx.update(ref, {
+        'status': 'active', // ready to startBattle again
+        'questions': q,
+        'currentIndex': 0,
+        'scores': {hostId: 0, guestId: 0},
+
+        'answers': {},
+        'locked': {},
+        'options': {},
+
+        'startedAt': null,
+        'battleStartsAt': null,
+        'questionStartedAt': null,
+      });
+    });
+  }
 
   Stream<BattleLobby?> watchLobby(String rawCode) {
     final code = normalizeCode(rawCode);
