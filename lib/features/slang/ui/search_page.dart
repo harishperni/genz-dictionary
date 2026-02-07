@@ -21,18 +21,12 @@ class SearchPage extends ConsumerStatefulWidget {
 class _SearchPageState extends ConsumerState<SearchPage> {
   final TextEditingController _controller = TextEditingController();
 
-  // Raw text as user types
   String _qRaw = '';
-
-  // Debounced query actually used to filter
   String _q = '';
-
   Timer? _debounce;
 
-  // Cache: term -> precomputed searchable text (lowercased)
   final Map<String, String> _hayCache = {};
 
-  // Key to trigger XP popup animation
   final GlobalKey<XPProgressBarState> xpBarKey = GlobalKey<XPProgressBarState>();
 
   @override
@@ -44,7 +38,6 @@ class _SearchPageState extends ConsumerState<SearchPage> {
 
   void _onQueryChanged(String v) {
     _qRaw = v;
-
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 180), () {
       if (!mounted) return;
@@ -56,14 +49,12 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     final query = q.trim().toLowerCase();
     if (query.isEmpty) return all;
 
-    // Defensive cache size (avoid unbounded growth if data changes)
-    if (_hayCache.length > all.length + 50) {
-      _hayCache.clear();
-    }
+    if (_hayCache.length > all.length + 50) _hayCache.clear();
 
     return all.where((e) {
       final hay = _hayCache.putIfAbsent(e.term, () {
-        return '${e.term} ${e.meaning} ${e.example} ${e.tags.join(" ")}'.toLowerCase();
+        return '${e.term} ${e.meaning} ${e.example} ${e.tags.join(" ")}'
+            .toLowerCase();
       });
       return hay.contains(query);
     }).toList();
@@ -75,70 +66,81 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     final sodAsync = ref.watch(slangOfDayProvider);
 
     return Container(
-      decoration: neonGradientBackground(),
+      decoration: neonGradientBackground(), // keep your existing background helper
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          title: const Text('Gen Z Dictionary'),
-          centerTitle: true,
-        ),
         body: SafeArea(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // ✅ Top Header (Replit vibe)
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
+                child: Row(
+                  children: [
+                    const _LogoMark(),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'GenZ Dict',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18,
+                      ),
+                    ),
+                    const Spacer(),
+                    _GlassPill(
+                      onTap: () => context.pushNamed('battle_menu'),
+                      child: Row(
+                        children: [
+                          Icon(Icons.sports_kabaddi_rounded,
+                              color: Colors.white.withOpacity(0.85), size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Battle',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.85),
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // XP bar
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: XPProgressBar(key: xpBarKey),
               ),
 
-              // Quick actions
+              // ✅ Quick actions row (glass chips)
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF5A2DF5), Color(0xFF6B34F0), Color(0xFF7C3AED)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+                child: Row(
+                  children: const [
+                    _QuickChip(
+                      icon: Icons.emoji_events_rounded,
+                      label: 'Badges',
+                      routeName: 'badges',
+                      accent: Color(0xFFFF4FD8),
                     ),
-                    borderRadius: BorderRadius.circular(26),
-                    border: Border.all(color: Colors.white.withOpacity(0.10)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF7C3AED).withOpacity(0.25),
-                        blurRadius: 16,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: const [
-                      _TopQuickAction(
-                        icon: Icons.emoji_events_rounded,
-                        label: 'Badges',
-                        routeName: 'badges',
-                      ),
-                      _TopDivider(),
-                      _TopQuickAction(
-                        icon: Icons.favorite_rounded,
-                        label: 'Favorites',
-                        routeName: 'favorites',
-                      ),
-                      _TopDivider(),
-                      _TopQuickAction(
-                        icon: Icons.quiz_rounded,
-                        label: 'Quiz',
-                        routeName: 'quiz',
-                      ),
-                      _TopDivider(),
-                      _TopQuickAction(
-                        icon: Icons.sports_kabaddi_rounded,
-                        label: 'Battle',
-                        routeName: 'battle_menu',
-                      ),
-                    ],
-                  ),
+                    SizedBox(width: 10),
+                    _QuickChip(
+                      icon: Icons.favorite_rounded,
+                      label: 'Favorites',
+                      routeName: 'favorites',
+                      accent: Color(0xFFA855F7),
+                    ),
+                    SizedBox(width: 10),
+                    _QuickChip(
+                      icon: Icons.quiz_rounded,
+                      label: 'Quiz',
+                      routeName: 'quiz',
+                      accent: Color(0xFF22D3EE),
+                    ),
+                  ],
                 ),
               ),
 
@@ -146,7 +148,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
 
               // Slang of day
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
                 child: sodAsync.when(
                   data: (e) => _SlangOfDayCard(entry: e),
                   loading: () => _glassShimmer(height: 88),
@@ -154,27 +156,12 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                 ),
               ),
 
-              // Search
+              // ✅ Search bar (glass)
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                child: TextField(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+                child: _GlassSearchBar(
                   controller: _controller,
                   onChanged: _onQueryChanged,
-                  decoration: InputDecoration(
-                    hintText: 'Search slang, meaning, tags…',
-                    prefixIcon: const Icon(Icons.search),
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.08),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  ),
                 ),
               ),
 
@@ -182,41 +169,54 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                 child: listAsync.when(
                   data: (all) {
                     final items = _filter(all, _q);
+
                     if (items.isEmpty) {
                       return Center(
                         child: Padding(
                           padding: const EdgeInsets.all(24),
                           child: Text(
                             'No results for "${_q.trim()}"',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.75),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       );
                     }
+
                     return ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 96),
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 110),
                       itemCount: items.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
                       itemBuilder: (context, i) => _SlangTile(entry: items[i]),
                     );
                   },
                   loading: () => ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 110),
                     itemCount: 10,
                     itemBuilder: (_, __) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: _glassShimmer(height: 64),
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _glassShimmer(height: 70),
                     ),
                   ),
-                  error: (e, _) => Center(child: Text('Error: $e')),
+                  error: (e, _) => Center(
+                    child: Text(
+                      'Error: $e',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
         ),
 
+        // Keep your debug XP button (optional)
         floatingActionButton: FloatingActionButton.extended(
-          backgroundColor: Colors.deepPurpleAccent,
+          backgroundColor: const Color(0xFF7C3AED),
           icon: const Icon(Icons.add, color: Colors.white),
           label: const Text('Add XP'),
           onPressed: () async {
@@ -231,39 +231,95 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   }
 }
 
-// --- Quick action helpers ---
-class _TopQuickAction extends StatelessWidget {
+// ---------- UI helpers (local to this file) ----------
+
+class _LogoMark extends StatelessWidget {
+  const _LogoMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 34,
+      height: 34,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF7C3AED), Color(0xFF22D3EE)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: const Center(
+        child: Text(
+          'Z',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+        ),
+      ),
+    );
+  }
+}
+
+class _GlassPill extends StatelessWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+
+  const _GlassPill({required this.child, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.07),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withOpacity(0.12)),
+        ),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _QuickChip extends StatelessWidget {
   final IconData icon;
   final String label;
   final String routeName;
+  final Color accent;
 
-  const _TopQuickAction({
-    super.key,
+  const _QuickChip({
     required this.icon,
     required this.label,
     required this.routeName,
+    required this.accent,
   });
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         onTap: () => context.pushNamed(routeName),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 2),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withOpacity(0.12)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 24, color: Colors.white),
-              const SizedBox(height: 6),
+              Icon(icon, color: accent, size: 20),
+              const SizedBox(width: 8),
               Text(
                 label,
                 style: TextStyle(
+                  color: Colors.white.withOpacity(0.90),
+                  fontWeight: FontWeight.w900,
                   fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white.withOpacity(0.95),
-                  letterSpacing: 0.15,
                 ),
               ),
             ],
@@ -274,15 +330,51 @@ class _TopQuickAction extends StatelessWidget {
   }
 }
 
-class _TopDivider extends StatelessWidget {
-  const _TopDivider({super.key});
+class _GlassSearchBar extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  const _GlassSearchBar({
+    required this.controller,
+    required this.onChanged,
+  });
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 1,
-      height: 28,
-      margin: const EdgeInsets.symmetric(horizontal: 12),
-      color: Colors.white.withOpacity(0.12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withOpacity(0.12)),
+      ),
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        decoration: InputDecoration(
+          hintText: 'Search slang, meaning, tags…',
+          hintStyle: TextStyle(color: Colors.white.withOpacity(0.45)),
+          prefixIcon: Icon(Icons.search, color: Colors.white.withOpacity(0.70)),
+          filled: true,
+          fillColor: Colors.transparent,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide(
+              color: const Color(0xFF7C3AED).withOpacity(0.9),
+              width: 1.2,
+            ),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        ),
+      ),
     );
   }
 }
@@ -302,9 +394,13 @@ class _SlangOfDayCard extends StatelessWidget {
         'detail',
         pathParameters: {'term': Uri.encodeComponent(e.term)},
       ),
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(18),
       child: Container(
-        decoration: glassCard(),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.07),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withOpacity(0.12)),
+        ),
         padding: const EdgeInsets.all(14),
         child: Row(
           children: [
@@ -313,10 +409,14 @@ class _SlangOfDayCard extends StatelessWidget {
             Expanded(
               child: Text(
                 'Slang of the Day: ${e.term}',
-                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 16,
+                ),
               ),
             ),
-            const Icon(Icons.chevron_right_rounded),
+            Icon(Icons.chevron_right_rounded, color: Colors.white.withOpacity(0.85)),
           ],
         ),
       ),
@@ -336,9 +436,13 @@ class _SlangTile extends StatelessWidget {
         'detail',
         pathParameters: {'term': Uri.encodeComponent(entry.term)},
       ),
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
-        decoration: glassCard(),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withOpacity(0.12)),
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
           children: [
@@ -357,26 +461,33 @@ class _SlangTile extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     entry.term,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     entry.meaning,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: Colors.white.withOpacity(0.85)),
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.78),
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded),
+            Icon(Icons.chevron_right_rounded, color: Colors.white.withOpacity(0.85)),
           ],
         ),
       ),
@@ -389,7 +500,7 @@ Widget _glassShimmer({double height = 60}) {
     height: height,
     decoration: BoxDecoration(
       color: Colors.white.withOpacity(0.06),
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(16),
       border: Border.all(color: Colors.white.withOpacity(0.12)),
     ),
   );

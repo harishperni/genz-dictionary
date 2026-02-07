@@ -7,6 +7,7 @@ import '../slang/app/slang_providers.dart';
 import '../slang/domain/slang_entry.dart';
 import 'battle_lobby_model.dart';
 import 'battle_lobby_service.dart';
+import 'package:genz_dictionary/theme/glass_widgets.dart';
 
 enum _OptionVisualState { neutral, correct, wrong }
 

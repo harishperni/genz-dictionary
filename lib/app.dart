@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import 'features/battle/battle_quiz_page.dart';
+import 'theme/genz_style.dart';
 
 // 🏠 Core feature imports
 import 'features/slang/ui/search_page.dart';
@@ -13,13 +15,10 @@ import 'features/slang/ui/quiz_page.dart';
 import 'features/streak/badges_page.dart';
 import 'features/streak/streak_banner.dart';
 
-// ⚔️ Battle Mode (Phase 1)
+// ⚔️ Battle Mode
 import 'features/battle/battle_menu_page.dart';
 import 'features/battle/create_lobby_page.dart';
 import 'features/battle/join_lobby_page.dart';
-
-// 🎨 Theme
-import 'theme/app_theme.dart';
 
 // 🧪 Debug
 import 'features/streak/debug_streak_panel.dart';
@@ -32,7 +31,6 @@ class MyApp extends ConsumerWidget {
     final router = GoRouter(
       initialLocation: '/',
       routes: [
-        /// 🏠 HOME
         GoRoute(
           path: '/',
           name: 'home',
@@ -42,7 +40,8 @@ class MyApp extends ConsumerWidget {
               path: 'detail/:term',
               name: 'detail',
               builder: (context, state) {
-                final term = Uri.decodeComponent(state.pathParameters['term']!);
+                final term =
+                    Uri.decodeComponent(state.pathParameters['term']!);
                 return DetailPage(term: term);
               },
             ),
@@ -66,7 +65,7 @@ class MyApp extends ConsumerWidget {
               name: 'battle_quiz',
               builder: (context, state) {
                 final code = state.pathParameters['code']!;
-                final uid = (state.extra as String?) ?? 'demo_user_1'; // fallback for safety
+                final uid = (state.extra as String?) ?? 'demo_user_1';
                 return BattleQuizPage(code: code, userId: uid);
               },
             ),
@@ -89,8 +88,6 @@ class MyApp extends ConsumerWidget {
             ),
           ],
         ),
-
-        /// 🧪 DEBUG STREAK PANEL (move it here!)
         GoRoute(
           path: '/debug-streak',
           name: 'debug_streak',
@@ -102,7 +99,7 @@ class MyApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'Gen Z Dictionary',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark(),
+      theme: GenZTheme.dark(), // ✅ only here
       routerConfig: router,
     );
   }
