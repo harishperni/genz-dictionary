@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../slang/app/slang_providers.dart';
 import '../slang/domain/slang_entry.dart';
@@ -27,16 +27,13 @@ class BattleQuizPage extends ConsumerStatefulWidget {
 class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
   final BattleLobbyService _service = BattleLobbyService();
 
-  // local UI state per question
+  String? _mySelected;
   bool _submitted = false;
 
-  // server time sync
   Duration _serverOffset = Duration.zero;
   bool _offsetReady = false;
 
-  // repaint ticker (UI only)
   Timer? _uiTick;
-
   int _lastIndexSeen = -1;
   bool _forcedLockThisIndex = false;
 
@@ -44,7 +41,6 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
   void initState() {
     super.initState();
 
-    // Get server offset once
     Future.microtask(() async {
       final off = await _service.getServerTimeOffset();
       if (!mounted) return;
@@ -54,7 +50,6 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
       });
     });
 
-    // Frequent UI repaint for timer smoothness
     _uiTick = Timer.periodic(const Duration(milliseconds: 200), (_) {
       if (!mounted) return;
       setState(() {});
@@ -70,19 +65,18 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
   DateTime _serverNow() => DateTime.now().add(_serverOffset);
 
   void _resetForIndex(int idx) {
+    _mySelected = null;
     _submitted = false;
     _forcedLockThisIndex = false;
   }
 
   int _remainingForLobby(BattleLobby lobby) {
     final startedAt = lobby.questionStartedAt;
-    final total = lobby.timerSeconds; // ✅ 15 comes from Firestore
+    final total = lobby.timerSeconds; // 15
     if (startedAt == null) return total;
 
     final elapsedMs = _serverNow().difference(startedAt).inMilliseconds;
     final remainingMs = (total * 1000) - elapsedMs;
-
-    // ceil so it doesn’t drop early
     final rem = (remainingMs / 1000).ceil();
     return rem.clamp(0, total);
   }
@@ -91,12 +85,6 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
     final diffMs = target.difference(_serverNow()).inMilliseconds;
     final s = (diffMs / 1000).ceil();
     return s < 0 ? 0 : s;
-  }
-
-  bool _isRevealWindow(BattleLobby lobby) {
-    if (lobby.advanceAt == null) return false;
-    final due = lobby.advanceAt!.add(Duration(milliseconds: lobby.advanceDelayMs));
-    return _serverNow().isBefore(due);
   }
 
   @override
@@ -135,10 +123,8 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
 
     if (lobby.status != 'started' && lobby.status != 'finished') {
       return const Center(
-        child: Text(
-          'Waiting for host to start…',
-          style: TextStyle(color: Colors.white),
-        ),
+        child: Text('Waiting for host to start…',
+            style: TextStyle(color: Colors.white)),
       );
     }
 
@@ -148,71 +134,60 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
       );
     }
 
-    // ✅ Finished screen: Winner + Share
+    // ✅ Finished screen with winner + share/copy
     if (lobby.status == 'finished') {
-      final hostId = lobby.hostId;
-      final guestId = lobby.guestId ?? '';
+      final hostScore = lobby.scores[lobby.hostId] ?? 0;
+      final guestScore =
+          (lobby.guestId == null) ? 0 : (lobby.scores[lobby.guestId!] ?? 0);
 
-      final hostScore = lobby.scores[hostId] ?? 0;
-      final guestScore = guestId.isEmpty ? 0 : (lobby.scores[guestId] ?? 0);
+      final isHostMe = lobby.hostId == widget.userId;
+      final myScore = isHostMe ? hostScore : guestScore;
+      final oppScore = isHostMe ? guestScore : hostScore;
 
-      final hostName = lobby.playerNames[hostId]?.trim().isNotEmpty == true
-          ? lobby.playerNames[hostId]!.trim()
-          : 'Host';
-
-      final guestName = lobby.playerNames[guestId]?.trim().isNotEmpty == true
-          ? lobby.playerNames[guestId]!.trim()
-          : 'Guest';
-
-      String winnerText;
-      if (hostScore == guestScore) {
-        winnerText = "It's a tie! 🤝";
-      } else if (hostScore > guestScore) {
-        winnerText = "$hostName won 🏆";
+      String resultText;
+      if (myScore > oppScore) {
+        resultText = 'You won 🏆';
+      } else if (myScore < oppScore) {
+        resultText = 'You lost 😭';
       } else {
-        winnerText = "$guestName won 🏆";
+        resultText = 'It’s a tie 🤝';
       }
 
       final shareText =
-          "Battle result: $hostName ($hostScore) vs $guestName ($guestScore). $winnerText";
+          'GenZ Dictionary Battle Result!\nCode: ${widget.code}\nHost: $hostScore  Guest: $guestScore';
 
       return Center(
-        child: Padding(
+        child: Container(
           padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.06),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withOpacity(0.14)),
+          ),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.emoji_events_rounded, color: Colors.amber, size: 56),
-              const SizedBox(height: 14),
-              Text(
-                winnerText,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                "$hostName: $hostScore\n$guestName: $guestScore",
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.80),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 22),
+              Text(resultText,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 22)),
+              const SizedBox(height: 12),
+              Text('Host: $hostScore   •   Guest: $guestScore',
+                  style: TextStyle(
+                      color: Colors.white.withOpacity(0.85),
+                      fontWeight: FontWeight.w700)),
+              const SizedBox(height: 18),
               ElevatedButton.icon(
-                onPressed: () => Share.share(shareText),
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: shareText));
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Copied result to clipboard ✅')),
+                  );
+                },
                 icon: const Icon(Icons.share_rounded),
-                label: const Text("Share with friends"),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                "Play again from Battle Menu",
-                style: TextStyle(color: Colors.white.withOpacity(0.6)),
+                label: const Text('Share / Copy Result'),
               ),
             ],
           ),
@@ -220,56 +195,36 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
       );
     }
 
-    // ✅ Phase 3 START GATE — both phones wait until shared battleStartsAt
+    // ✅ Start gate (both phones wait)
     final startAt = lobby.battleStartsAt;
     if (startAt != null && _serverNow().isBefore(startAt)) {
       final secs = _secondsUntil(startAt);
-
       return Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.sports_kabaddi_rounded, color: Colors.white, size: 44),
+          const Icon(Icons.sports_kabaddi_rounded,
+              color: Colors.white, size: 44),
           const SizedBox(height: 14),
-          const Text(
-            'Get ready…',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
+          const Text('Get ready…',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900)),
           const SizedBox(height: 10),
-          Text(
-            'Starting in ${secs}s',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.80),
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 18),
-          SizedBox(
-            width: 220,
-            child: LinearProgressIndicator(
-              value: (1 - (secs / 5)).clamp(0.0, 1.0),
-              minHeight: 8,
-              backgroundColor: Colors.white.withOpacity(0.10),
-            ),
-          ),
-          const SizedBox(height: 26),
-          Text(
-            'Both players will start together.',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.65),
-              fontWeight: FontWeight.w700,
-            ),
-            textAlign: TextAlign.center,
-          ),
+          Text('Starting in ${secs}s',
+              style: TextStyle(
+                  color: Colors.white.withOpacity(0.80),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700)),
+          const SizedBox(height: 22),
+          Text('Both players will start together.',
+              style: TextStyle(
+                  color: Colors.white.withOpacity(0.65),
+                  fontWeight: FontWeight.w700)),
         ],
       );
     }
 
-    // Normal in-game view
     final idx = lobby.currentIndex;
 
     if (idx != _lastIndexSeen) {
@@ -279,19 +234,14 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
 
     if (idx < 0 || idx >= lobby.questions.length) {
       return const Center(
-        child: Text(
-          'Invalid question index.',
-          style: TextStyle(color: Colors.white),
-        ),
+        child: Text('Invalid question index.',
+            style: TextStyle(color: Colors.white)),
       );
     }
 
     final term = lobby.questions[idx];
-
-    // locked status
     final locked = lobby.locked['$idx'] == true;
 
-    // answers for index
     final answersForIndex =
         (lobby.answers['$idx'] as Map?)?.cast<String, dynamic>() ?? {};
 
@@ -312,18 +262,15 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
         answersForIndex.containsKey(lobby.hostId) &&
         answersForIndex.containsKey(lobby.guestId);
 
-    // reveal when locked OR I answered
     final reveal = myAnswer != null || locked;
 
-    // scores
     final hostScore = lobby.scores[lobby.hostId] ?? 0;
     final guestScore =
         (lobby.guestId == null) ? 0 : (lobby.scores[lobby.guestId!] ?? 0);
 
-    // remaining time (server-based)
     final remaining = _remainingForLobby(lobby);
 
-    // If time is up and not locked yet, force lock ONCE
+    // Time up → lock once
     if (remaining <= 0 && !locked && !_forcedLockThisIndex) {
       _forcedLockThisIndex = true;
       Future.microtask(() async {
@@ -331,14 +278,17 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
       });
     }
 
-    // ✅ If locked and reveal window finished, advance (safe to call many times)
-    if (locked && lobby.advanceAt != null && !_isRevealWindow(lobby)) {
+    // ✅ If locked, host advances AFTER delay (both will see red/green during delay)
+    if (locked && lobby.hostId == widget.userId) {
       Future.microtask(() async {
-        await _service.advanceIfDue(rawCode: widget.code);
+        await _service.advanceIfReady(
+          rawCode: widget.code,
+          hostUserId: widget.userId,
+          serverOffset: _serverOffset,
+          revealDelayMs: 2200,
+        );
       });
     }
-
-    final isRevealing = locked && lobby.advanceAt != null && _isRevealWindow(lobby);
 
     return ref.watch(slangListProvider).when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -348,32 +298,16 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
       data: (slangs) {
         final entry = _findEntry(slangs, term);
         final correctAnswer = entry.meaning.trim();
-
-        // frozen options
         final options = lobby.options['$idx'];
 
         if (options == null || options.length < 4) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _topRow(hostScore: hostScore, guestScore: guestScore),
-              const SizedBox(height: 12),
-              _banner(text: 'Preparing options…', icon: Icons.hourglass_top),
-              const SizedBox(height: 16),
-              _questionCard(idx: idx, total: lobby.questions.length, entry: entry),
-              const Spacer(),
-              const Center(child: CircularProgressIndicator()),
-            ],
-          );
+          return const Center(child: CircularProgressIndicator());
         }
 
-        // status banner logic
         Widget statusBanner;
         if (locked) {
           statusBanner = _banner(
-            text: bothAnswered
-                ? (isRevealing ? 'Showing results…' : 'Locked 🔒')
-                : (isRevealing ? 'Time up — showing results…' : 'Locked 🔒 time up'),
+            text: bothAnswered ? 'Locked 🔒 both answered' : 'Locked 🔒 time up',
             icon: Icons.lock_rounded,
           );
         } else if (oppAnswered) {
@@ -393,6 +327,7 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
           children: [
             _topRow(hostScore: hostScore, guestScore: guestScore),
             const SizedBox(height: 12),
+
             Row(
               children: [
                 _pill(
@@ -404,6 +339,7 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
                 Expanded(child: statusBanner),
               ],
             ),
+
             const SizedBox(height: 14),
             _questionCard(idx: idx, total: lobby.questions.length, entry: entry),
             const SizedBox(height: 12),
@@ -414,12 +350,13 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
                 opt: opt,
                 correct: correctAnswer,
                 myAnswer: myAnswer,
-                reveal: reveal, // ✅ locked triggers reveal for both
+                reveal: reveal,
                 locked: locked,
-                onTap: (locked || isRevealing || _submitted || remaining <= 0)
+                onTap: (locked || _submitted || remaining <= 0)
                     ? null
                     : () async {
                         setState(() {
+                          _mySelected = opt;
                           _submitted = true;
                         });
 
@@ -433,7 +370,6 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
                       },
               ),
             ],
-
             const Spacer(),
           ],
         );
@@ -467,10 +403,9 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Question ${idx + 1} / $total',
-          style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w700),
-        ),
+        Text('Question ${idx + 1} / $total',
+            style: const TextStyle(
+                color: Colors.white70, fontWeight: FontWeight.w700)),
         const SizedBox(height: 10),
         Container(
           width: double.infinity,
@@ -480,14 +415,11 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: Colors.white.withOpacity(0.12)),
           ),
-          child: Text(
-            'What does “${entry.term}” mean?',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+          child: Text('What does “${entry.term}” mean?',
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800)),
         ),
       ],
     );
@@ -533,13 +465,9 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
         child: Row(
           children: [
             Expanded(
-              child: Text(
-                opt,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
+              child: Text(opt,
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.w800)),
             ),
             if (locked)
               const Icon(Icons.lock_rounded, color: Colors.white70, size: 18),
@@ -562,13 +490,9 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
           Icon(icon, color: Colors.white70, size: 18),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
+            child: Text(text,
+                style: const TextStyle(
+                    color: Colors.white70, fontWeight: FontWeight.w800)),
           ),
         ],
       ),
@@ -603,19 +527,15 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
       ),
       child: Row(
         children: [
-          Text(
-            label,
-            style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800),
-          ),
+          Text(label,
+              style: const TextStyle(
+                  color: Colors.white70, fontWeight: FontWeight.w800)),
           const Spacer(),
-          Text(
-            '$score',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
-              fontSize: 18,
-            ),
-          ),
+          Text('$score',
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 18)),
         ],
       ),
     );

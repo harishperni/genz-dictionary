@@ -33,13 +33,8 @@ class BattleLobby {
   /// Timestamp when battle should start (server time) — used for sync
   final DateTime? battleStartsAt;
 
-  /// When a question becomes locked, we set advanceAt = serverTimestamp().
-  /// Client waits (advanceDelayMs) then advances.
+  /// ✅ NEW: when locked, wait until this before advancing
   final DateTime? advanceAt;
-  final int advanceDelayMs;
-
-  /// uid -> displayName (optional). Falls back to Host/Guest if missing.
-  final Map<String, String> playerNames;
 
   final DateTime? createdAt;
   final DateTime? startedAt;
@@ -59,13 +54,11 @@ class BattleLobby {
     required this.questionStartedAt,
     required this.battleStartsAt,
     required this.advanceAt,
-    required this.advanceDelayMs,
-    required this.playerNames,
     required this.createdAt,
     required this.startedAt,
   });
 
-  /// Backwards-friendly getter (some pages use durationSec)
+  /// Backwards-friendly getter
   int get durationSec => timerSeconds;
 
   static DateTime? _ts(dynamic v) {
@@ -103,13 +96,6 @@ class BattleLobby {
     return out;
   }
 
-  static Map<String, String> _parseStringMap(dynamic raw) {
-    final m = (raw as Map?) ?? const {};
-    final out = <String, String>{};
-    m.forEach((k, v) => out[k.toString()] = v?.toString() ?? '');
-    return out;
-  }
-
   factory BattleLobby.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
 
@@ -123,45 +109,16 @@ class BattleLobby {
       status: (data['status'] ?? 'waiting') as String,
       questions: questions,
       currentIndex: (data['currentIndex'] ?? 0) as int,
-
       scores: _parseScores(data['scores']),
       answers: _parseStringKeyedMap(data['answers']),
       locked: _parseStringKeyedMap(data['locked']),
       options: _parseOptions(data['options']),
-
       timerSeconds: (data['timerSeconds'] ?? 15) as int,
       questionStartedAt: _ts(data['questionStartedAt']),
       battleStartsAt: _ts(data['battleStartsAt']),
-
       advanceAt: _ts(data['advanceAt']),
-      advanceDelayMs: (data['advanceDelayMs'] ?? 2500) as int,
-
-      playerNames: _parseStringMap(data['playerNames']),
-
       createdAt: _ts(data['createdAt']),
       startedAt: _ts(data['startedAt']),
     );
-  }
-
-  Map<String, dynamic> toMap() {
-    return {
-      'hostId': hostId,
-      'guestId': guestId,
-      'status': status,
-      'questions': questions,
-      'currentIndex': currentIndex,
-      'scores': scores,
-      'answers': answers,
-      'locked': locked,
-      'options': options,
-      'timerSeconds': timerSeconds,
-      'questionStartedAt': questionStartedAt,
-      'battleStartsAt': battleStartsAt,
-      'advanceAt': advanceAt,
-      'advanceDelayMs': advanceDelayMs,
-      'playerNames': playerNames,
-      'createdAt': createdAt,
-      'startedAt': startedAt,
-    };
   }
 }
