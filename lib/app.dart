@@ -2,26 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'features/battle/battle_quiz_page.dart';
 import 'theme/genz_style.dart';
 
-// 🏠 Core feature imports
+// Slang pages
 import 'features/slang/ui/search_page.dart';
 import 'features/slang/ui/detail_page.dart';
 import 'features/slang/ui/favorites_page.dart';
 import 'features/slang/ui/quiz_page.dart';
 
-// 🏅 Streaks & Badges
+// Streak
 import 'features/streak/badges_page.dart';
-import 'features/streak/streak_banner.dart';
+import 'features/streak/debug_streak_panel.dart';
 
-// ⚔️ Battle Mode
+// Battle
 import 'features/battle/battle_menu_page.dart';
 import 'features/battle/create_lobby_page.dart';
 import 'features/battle/join_lobby_page.dart';
-
-// 🧪 Debug
-import 'features/streak/debug_streak_panel.dart';
+import 'features/battle/battle_quiz_page.dart';
+import 'features/battle/battle_stats_page.dart';
 
 class MyApp extends ConsumerWidget {
   const MyApp({super.key});
@@ -40,8 +38,7 @@ class MyApp extends ConsumerWidget {
               path: 'detail/:term',
               name: 'detail',
               builder: (context, state) {
-                final term =
-                    Uri.decodeComponent(state.pathParameters['term']!);
+                final term = Uri.decodeComponent(state.pathParameters['term']!);
                 return DetailPage(term: term);
               },
             ),
@@ -60,6 +57,8 @@ class MyApp extends ConsumerWidget {
               name: 'badges',
               builder: (context, state) => const BadgesPage(),
             ),
+
+            // ✅ Battle Quiz
             GoRoute(
               path: 'quiz/:code',
               name: 'battle_quiz',
@@ -69,6 +68,8 @@ class MyApp extends ConsumerWidget {
                 return BattleQuizPage(code: code, userId: uid);
               },
             ),
+
+            // ✅ Battle Menu
             GoRoute(
               path: 'battle',
               name: 'battle_menu',
@@ -84,10 +85,19 @@ class MyApp extends ConsumerWidget {
                   name: 'join_lobby',
                   builder: (context, state) => const JoinLobbyPage(),
                 ),
+
+                // ✅ Battle Stats route (your button calls this)
+                GoRoute(
+                  path: 'stats',
+                  name: 'battle_stats',
+                  builder: (context, state) => const BattleStatsPage(),
+                ),
               ],
             ),
           ],
         ),
+
+        // Debug
         GoRoute(
           path: '/debug-streak',
           name: 'debug_streak',
@@ -99,7 +109,7 @@ class MyApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'Gen Z Dictionary',
       debugShowCheckedModeBanner: false,
-      theme: GenZTheme.dark(), // ✅ only here
+      theme: GenZTheme.dark(),
       routerConfig: router,
     );
   }

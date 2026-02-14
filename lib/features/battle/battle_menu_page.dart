@@ -20,7 +20,7 @@ class BattleMenuPage extends StatelessWidget {
         child: SafeArea(
           child: Column(
             children: [
-              // Top bar (matches Replit header feel)
+              // Top bar
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                 child: Row(
@@ -40,8 +40,11 @@ class BattleMenuPage extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       child: Row(
                         children: [
-                          Icon(Icons.sports_kabaddi_rounded,
-                              color: Colors.white.withOpacity(0.85), size: 18),
+                          Icon(
+                            Icons.sports_kabaddi_rounded,
+                            color: Colors.white.withOpacity(0.85),
+                            size: 18,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             'Battle',
@@ -59,8 +62,12 @@ class BattleMenuPage extends StatelessWidget {
 
               const SizedBox(height: 28),
 
-              // Page title block
-              const Icon(Icons.sports_kabaddi_rounded, color: Color(0xFFFF4FD8), size: 54),
+              // Title
+              const Icon(
+                Icons.sports_kabaddi_rounded,
+                color: Color(0xFFFF4FD8),
+                size: 54,
+              ),
               const SizedBox(height: 12),
               const Text(
                 'Battle Mode',
@@ -80,11 +87,12 @@ class BattleMenuPage extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                   fontSize: 16,
                 ),
+                textAlign: TextAlign.center,
               ),
 
               const SizedBox(height: 26),
 
-              // Main cards row
+              // Cards (Create / Join)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 18),
                 child: LayoutBuilder(
@@ -129,6 +137,34 @@ class BattleMenuPage extends StatelessWidget {
                       ],
                     );
                   },
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // ✅ Battle Stats button (placed OUTSIDE the LayoutBuilder)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: () => context.pushNamed('battle_stats'),
+                    icon: const Icon(Icons.bar_chart_rounded, color: Colors.white),
+                    label: const Text(
+                      'Battle Stats',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: Colors.white.withOpacity(0.25)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
                 ),
               ),
 

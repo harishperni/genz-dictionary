@@ -16,7 +16,7 @@ dependencies:
 
   # Utils
   http: ^1.2.2
-  google_fonts: ^6.2.1
+  #google_fonts: ^6.2.1
   intl: ^0.20.2
 
   # Share card

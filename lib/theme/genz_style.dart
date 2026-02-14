@@ -1,13 +1,12 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class GenZColors {
   static const bg0 = Color(0xFF05060A);
   static const bg1 = Color(0xFF0B1020);
   static const bg2 = Color(0xFF150A2E);
 
-  static const card = Color(0x14FFFFFF); // white with low opacity
+  static const card = Color(0x14FFFFFF);
   static const cardBorder = Color(0x22FFFFFF);
 
   static const text = Color(0xFFF3F4F6);
@@ -35,6 +34,12 @@ class GenZTheme {
   static ThemeData dark() {
     final base = ThemeData.dark();
 
+    // Use system font (no google_fonts package)
+    final textTheme = base.textTheme.apply(
+      bodyColor: GenZColors.text,
+      displayColor: GenZColors.text,
+    );
+
     return base.copyWith(
       scaffoldBackgroundColor: GenZColors.bg0,
       colorScheme: base.colorScheme.copyWith(
@@ -42,12 +47,12 @@ class GenZTheme {
         secondary: GenZColors.teal,
         surface: GenZColors.card,
       ),
-      textTheme: GoogleFonts.poppinsTextTheme(base.textTheme).copyWith(
-        titleLarge: GoogleFonts.poppins(
+      textTheme: textTheme.copyWith(
+        titleLarge: textTheme.titleLarge?.copyWith(
           fontWeight: FontWeight.w800,
           color: GenZColors.text,
         ),
-        bodyMedium: GoogleFonts.poppins(
+        bodyMedium: textTheme.bodyMedium?.copyWith(
           color: GenZColors.textMuted,
           fontWeight: FontWeight.w500,
         ),
@@ -56,7 +61,7 @@ class GenZTheme {
         backgroundColor: Colors.transparent,
         elevation: 0,
         foregroundColor: GenZColors.text,
-        titleTextStyle: GoogleFonts.poppins(
+        titleTextStyle: textTheme.titleLarge?.copyWith(
           color: GenZColors.text,
           fontSize: 18,
           fontWeight: FontWeight.w800,
@@ -67,8 +72,10 @@ class GenZTheme {
           backgroundColor: GenZColors.purpleDark,
           foregroundColor: Colors.white,
           minimumSize: const Size(200, 48),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          textStyle: GoogleFonts.poppins(fontWeight: FontWeight.w800),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          textStyle: const TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -85,7 +92,10 @@ class GenZTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: GenZColors.purpleDark, width: 1.4),
+          borderSide: const BorderSide(
+            color: GenZColors.purpleDark,
+            width: 1.4,
+          ),
         ),
       ),
     );

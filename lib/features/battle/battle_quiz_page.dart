@@ -8,6 +8,7 @@ import '../slang/domain/slang_entry.dart';
 import 'battle_lobby_model.dart';
 import 'battle_lobby_service.dart';
 import 'package:genz_dictionary/theme/glass_widgets.dart';
+import 'battle_history_service.dart';
 
 enum _OptionVisualState { neutral, correct, wrong }
 
@@ -137,6 +138,12 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
 
     // ✅ Finished screen with winner + share/copy
         if (lobby.status == 'finished') {
+          Future.microtask(() {
+            BattleHistoryService().recordBattleIfNeeded(
+              lobbyCode: widget.code,
+                );
+                });
+          
       final hostScore = lobby.scores[lobby.hostId] ?? 0;
       final guestScore =
           (lobby.guestId == null) ? 0 : (lobby.scores[lobby.guestId!] ?? 0);
