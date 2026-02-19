@@ -3,7 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:genz_dictionary/theme/glass_widgets.dart';
 
 class BattleMenuPage extends StatelessWidget {
-  const BattleMenuPage({super.key});
+  final String userId;
+  const BattleMenuPage({super.key, required this.userId});
 
   @override
   Widget build(BuildContext context) {
@@ -149,7 +150,7 @@ class BattleMenuPage extends StatelessWidget {
                   width: double.infinity,
                   height: 48,
                   child: OutlinedButton.icon(
-                    onPressed: () => context.pushNamed('battle_stats'),
+                    onPressed: () => context.pushNamed('battle_stats', extra: userId),
                     icon: const Icon(Icons.bar_chart_rounded, color: Colors.white),
                     label: const Text(
                       'Battle Stats',

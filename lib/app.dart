@@ -21,6 +21,7 @@ import 'features/battle/join_lobby_page.dart';
 import 'features/battle/battle_quiz_page.dart';
 import 'features/battle/battle_stats_page.dart';
 
+
 class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
@@ -64,7 +65,7 @@ class MyApp extends ConsumerWidget {
               name: 'battle_quiz',
               builder: (context, state) {
                 final code = state.pathParameters['code']!;
-                final uid = (state.extra as String?) ?? 'demo_user_1';
+                final uid = (state.extra as String?) ?? 'demo_user1'; // fallback for testing
                 return BattleQuizPage(code: code, userId: uid);
               },
             ),
@@ -73,7 +74,10 @@ class MyApp extends ConsumerWidget {
             GoRoute(
               path: 'battle',
               name: 'battle_menu',
-              builder: (context, state) => const BattleMenuPage(),
+              builder: (context, state) {
+                final uid = (state.extra as String?) ?? 'demo_user_1';
+                return BattleMenuPage(userId: uid);
+                },
               routes: [
                 GoRoute(
                   path: 'create',
@@ -88,10 +92,13 @@ class MyApp extends ConsumerWidget {
 
                 // ✅ Battle Stats route (your button calls this)
                 GoRoute(
-                  path: 'stats',
+                  path: 'battle-stats',
                   name: 'battle_stats',
-                  builder: (context, state) => const BattleStatsPage(),
-                ),
+                  builder: (context, state) {
+                    final uid = (state.extra as String?)?? 'demo_user1';
+                    return BattleStatsPage(userId: uid);
+                    },
+                    ),
               ],
             ),
           ],
