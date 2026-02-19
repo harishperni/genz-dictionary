@@ -33,7 +33,7 @@ class _CreateLobbyPageState extends ConsumerState<CreateLobbyPage> {
     super.dispose();
   }
 
-  String get _uid => FirebaseAuth.instance.currentUser!.uid;
+  String get _uid => FirebaseAuth.instance.currentUser!.uid ?? 'demo_user1';
 
   Future<void> _createLobby() async {
     setState(() => _creating = true);

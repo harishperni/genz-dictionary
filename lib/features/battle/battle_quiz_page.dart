@@ -138,6 +138,7 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
 
     // ✅ Finished screen with winner + share/copy
         if (lobby.status == 'finished') {
+          Future.microtask(() => _service.saveBattleResultIfNeeded(rawCode: widget.code));
           Future.microtask(() async {
             await _service.saveBattleResultIfNeeded(rawCode: widget.code);
             });

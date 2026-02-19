@@ -3,10 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'battle_lobby_service.dart';
 import 'battle_lobby_model.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 class JoinLobbyPage extends ConsumerStatefulWidget {
   const JoinLobbyPage({super.key});
@@ -34,15 +34,11 @@ class _JoinLobbyPageState extends ConsumerState<JoinLobbyPage> {
     super.dispose();
   }
 
-  String _normalizeCode(String raw) {
-    return raw
-        .toUpperCase()
-        .replaceAll(RegExp(r'[^A-Z0-9]'), '')
-        .trim();
-  }
+  // ✅ safe uid (never crash)
+  String get _uid => FirebaseAuth.instance.currentUser?.uid ?? 'demo_user_1';
 
   Future<void> _joinLobby() async {
-    final code = _normalizeCode(_codeController.text);
+    final code = _service.normalizeCode(_codeController.text);
     if (code.isEmpty) return;
 
     setState(() {
@@ -52,11 +48,10 @@ class _JoinLobbyPageState extends ConsumerState<JoinLobbyPage> {
       _lobby = null;
     });
 
-    try {
-      final userId = FirebaseAuth.instance.currentUser!.uid;
-     // TODO replace with FirebaseAuth uid later
+    final userId = _uid;
 
-      // ✅ join lobby (safe join logic should be in service)
+    try {
+      // ✅ join lobby
       final success = await _service.joinLobby(code, userId);
 
       if (!success) {
@@ -77,7 +72,7 @@ class _JoinLobbyPageState extends ConsumerState<JoinLobbyPage> {
 
         setState(() => _lobby = lobby);
 
-        // ✅ Phase 2: navigate ONLY ONCE when status becomes started
+        // ✅ Navigate ONLY ONCE when started
         if (!_navigated && lobby.status == 'started') {
           _navigated = true;
 
@@ -86,7 +81,7 @@ class _JoinLobbyPageState extends ConsumerState<JoinLobbyPage> {
             context.goNamed(
               'battle_quiz',
               pathParameters: {'code': code},
-              extra: userId, // ✅ pass guest userId via extra
+              extra: userId, // ✅ always a non-null String now
             );
           });
         }

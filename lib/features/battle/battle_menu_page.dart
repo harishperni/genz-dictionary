@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:genz_dictionary/theme/glass_widgets.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class BattleMenuPage extends StatelessWidget {
   final String userId;
@@ -150,7 +151,16 @@ class BattleMenuPage extends StatelessWidget {
                   width: double.infinity,
                   height: 48,
                   child: OutlinedButton.icon(
-                    onPressed: () => context.pushNamed('battle_stats', extra: userId),
+                    onPressed: () {
+                      final uid = FirebaseAuth.instance.currentUser?.uid;
+                      if (uid == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Not logged in yet. Try again in a second.')),
+                        );
+                        return;
+                      }
+                      context.pushNamed('battle_stats', extra: uid);
+                    },
                     icon: const Icon(Icons.bar_chart_rounded, color: Colors.white),
                     label: const Text(
                       'Battle Stats',
