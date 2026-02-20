@@ -30,7 +30,10 @@ class FavoritesPage extends ConsumerWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                     child: InkWell(
-                      onTap: () => context.push('/term/$term'),
+                      onTap: () => context.pushNamed(
+                        'detail',
+                        pathParameters: {'term': Uri.encodeComponent(term)},
+                      ),
                       borderRadius: BorderRadius.circular(20),
                       child: Container(
                         decoration: glassCard(),
@@ -52,7 +55,10 @@ class FavoritesPage extends ConsumerWidget {
                             IconButton(
                               tooltip: 'Share',
                               icon: const Icon(Icons.share_rounded),
-                              onPressed: () => context.push('/term/$term'),
+                              onPressed: () => context.pushNamed(
+                                'detail',
+                                pathParameters: {'term': Uri.encodeComponent(term)},
+                              ),
                             ),
                             IconButton(
                               tooltip: 'Remove from favorites',

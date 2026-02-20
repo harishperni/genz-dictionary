@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // 🏠 Core feature imports
 import 'features/slang/ui/search_page.dart';
@@ -18,6 +19,7 @@ import 'features/battle/create_lobby_page.dart';
 import 'features/battle/join_lobby_page.dart';
 import 'features/battle/battle_quiz_page.dart';
 import 'features/battle/battle_stats_page.dart'; // ✅ make sure this file exists
+import 'features/profile/profile_setup_page.dart';
 
 // 🎨 Theme
 import 'theme/genz_style.dart';
@@ -41,6 +43,32 @@ class MyApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = GoRouter(
       initialLocation: '/',
+      redirect: (context, state) async {
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        if (uid == null) return null;
+
+        const setupPath = '/profile-setup';
+        const skipPaths = <String>{
+          '/debug-streak',
+        };
+        if (skipPaths.contains(state.matchedLocation)) return null;
+
+        final snap =
+            await FirebaseFirestore.instance.collection('users').doc(uid).get();
+        final data = snap.data() ?? const <String, dynamic>{};
+        final displayId = (data['displayId'] ?? '').toString().trim();
+        final hasDisplayId = displayId.isNotEmpty;
+        final isProfileSetup = state.matchedLocation == setupPath;
+        final isEditMode = state.uri.queryParameters['mode'] == 'edit';
+
+        if (!hasDisplayId && !isProfileSetup) {
+          return setupPath;
+        }
+        if (hasDisplayId && isProfileSetup && !isEditMode) {
+          return '/';
+        }
+        return null;
+      },
       routes: [
         /// 🏠 HOME (Search)
         GoRoute(
@@ -120,6 +148,12 @@ class MyApp extends ConsumerWidget {
             return BattleStatsPage(userId: uid);
           },
           ),
+
+        GoRoute(
+          path: '/profile-setup',
+          name: 'profile_setup',
+          builder: (_, __) => const ProfileSetupPage(),
+        ),
 
         /// 🧪 DEBUG STREAK PANEL
         GoRoute(

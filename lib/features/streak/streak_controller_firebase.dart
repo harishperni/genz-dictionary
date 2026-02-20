@@ -10,7 +10,7 @@ import 'streak_service_firebase.dart';
 /// Riverpod provider for the Firebase-backed streak/badges state.
 final streakFBProvider =
     StateNotifierProvider<StreakFBController, StreakFB>((ref) {
-  final uid = FirebaseAuth.instance.currentUser!.uid;
+  final uid = FirebaseAuth.instance.currentUser?.uid ?? 'demo_user_1';
   final service = StreakServiceFirebase(uid: uid);
   return StreakFBController(service);
 });

@@ -109,7 +109,7 @@ class StreakServiceFirebase {
 
   StreakServiceFirebase({String? uid})
       : _db = FirebaseFirestore.instance,
-        uid = uid ?? FirebaseAuth.instance.currentUser!.uid;
+        uid = uid ?? FirebaseAuth.instance.currentUser?.uid ?? 'demo_user_1';
 
   DocumentReference<Map<String, dynamic>> _doc() =>
       _db.collection('users').doc(uid);
@@ -443,11 +443,10 @@ Future<void> debugAddXP(int amount) async {
   await _db.runTransaction((tx) async {
     final snap = await tx.get(ref);
     final data = StreakFB.fromMap(snap.data());
-    final newXP = (data.xp ?? 0) + amount;
+    final newXP = data.xp + amount;
     tx.update(ref, {'xp': newXP});
   });
 }
 } // 👈 only ONE final brace at the very end
 
   
-

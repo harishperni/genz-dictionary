@@ -7,7 +7,6 @@ import '../slang/app/slang_providers.dart';
 import '../slang/domain/slang_entry.dart';
 import 'battle_lobby_model.dart';
 import 'battle_lobby_service.dart';
-import 'package:genz_dictionary/theme/glass_widgets.dart';
 import 'battle_history_service.dart';
 
 enum _OptionVisualState { neutral, correct, wrong }
@@ -29,7 +28,6 @@ class BattleQuizPage extends ConsumerStatefulWidget {
 class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
   final BattleLobbyService _service = BattleLobbyService();
 
-  String? _mySelected;
   bool _submitted = false;
 
   Duration _serverOffset = Duration.zero;
@@ -38,6 +36,7 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
   Timer? _uiTick;
   int _lastIndexSeen = -1;
   bool _forcedLockThisIndex = false;
+  bool _resultPersistTriggered = false;
 
   @override
   void initState() {
@@ -67,7 +66,6 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
   DateTime _serverNow() => DateTime.now().add(_serverOffset);
 
   void _resetForIndex(int idx) {
-    _mySelected = null;
     _submitted = false;
     _forcedLockThisIndex = false;
   }
@@ -137,17 +135,16 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
     }
 
     // ✅ Finished screen with winner + share/copy
-        if (lobby.status == 'finished') {
-          Future.microtask(() => _service.saveBattleResultIfNeeded(rawCode: widget.code));
-          Future.microtask(() async {
-            await _service.saveBattleResultIfNeeded(rawCode: widget.code);
-            });
-          Future.microtask(() {
-            BattleHistoryService().recordBattleIfNeeded(
-              lobbyCode: widget.code,
-                );
-                });
-          
+    if (lobby.status == 'finished') {
+      if (!_resultPersistTriggered) {
+        _resultPersistTriggered = true;
+        Future.microtask(() async {
+          await BattleHistoryService().recordBattleIfNeeded(
+            lobbyCode: widget.code,
+          );
+        });
+      }
+
       final hostScore = lobby.scores[lobby.hostId] ?? 0;
       final guestScore =
           (lobby.guestId == null) ? 0 : (lobby.scores[lobby.guestId!] ?? 0);
@@ -445,7 +442,6 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
                     ? null
                     : () async {
                         setState(() {
-                          _mySelected = opt;
                           _submitted = true;
                         });
 

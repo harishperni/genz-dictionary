@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../theme/glass_widgets.dart'; // adjust if your path differs
 
@@ -10,16 +11,31 @@ class BattleStatsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final statsDoc = FirebaseFirestore.instance.collection('battle_stats').doc(userId);
+    final db = FirebaseFirestore.instance;
+    final statsDoc = db
+        .collection('users')
+        .doc(userId)
+        .collection('battle_stats')
+        .doc('main');
 
-    final historyQuery = FirebaseFirestore.instance
+    final historyQuery = db
+        .collection('users')
+        .doc(userId)
         .collection('battle_history')
-        .where('players', arrayContains: userId)
-        .orderBy('finishedAt', descending: true)
+        .orderBy('recordedAt', descending: true)
         .limit(10);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Battle Stats')),
+      appBar: AppBar(
+        title: const Text('Battle Stats'),
+        actions: [
+          IconButton(
+            tooltip: 'Edit ID',
+            icon: const Icon(Icons.edit_rounded),
+            onPressed: () => context.push('/profile-setup?mode=edit'),
+          ),
+        ],
+      ),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -37,11 +53,12 @@ class BattleStatsPage extends ConsumerWidget {
                   stream: statsDoc.snapshots(),
                   builder: (context, snap) {
                     final data = snap.data?.data() ?? {};
-                    int _asInt(dynamic v) => (v is int) ? v : (v is num) ? v.toInt() : int.tryParse('$v') ?? 0;
-                    final total = _asInt(data['total']);
-                    final wins = _asInt(data['wins']);
-                    final losses = _asInt(data['losses']);
-                    final ties = _asInt(data['ties']);
+                    int asInt(dynamic v) =>
+                        (v is int) ? v : (v is num) ? v.toInt() : int.tryParse('$v') ?? 0;
+                    final total = asInt(data['gamesPlayed']);
+                    final wins = asInt(data['wins']);
+                    final losses = asInt(data['losses']);
+                    final ties = asInt(data['ties']);
 
                     final rate = total == 0 ? 0 : ((wins / total) * 100).round();
 
@@ -123,20 +140,26 @@ class BattleStatsPage extends ConsumerWidget {
                         separatorBuilder: (_, __) => const SizedBox(height: 10),
                         itemBuilder: (context, i) {
                           final d = docs[i].data();
-                          final hostId = (d['hostId'] ?? '') as String;
-                          final guestId = (d['guestId'] ?? '') as String;
-                          final hostScore = (d['hostScore'] ?? 0) as int;
-                          final guestScore = (d['guestScore'] ?? 0) as int;
-                          final winnerId = (d['winnerId'] ?? '') as String;
-
-                          final oppId = (userId == hostId) ? guestId : hostId;
-                          final myScore = (userId == hostId) ? hostScore : guestScore;
-                          final oppScore = (userId == hostId) ? guestScore : hostScore;
+                          int asInt(dynamic v) => (v is int)
+                              ? v
+                              : (v is num)
+                                  ? v.toInt()
+                                  : int.tryParse('$v') ?? 0;
+                          final oppId = (d['opponentId'] ?? '') as String;
+                          final myScore = asInt(d['myScore']);
+                          final oppScore = asInt(d['opponentScore']);
+                          final outcome = (d['outcome'] ?? '') as String;
 
                           String label;
-                          if (winnerId.isEmpty) label = 'Tie 🤝';
-                          else if (winnerId == userId) label = 'Win 🏆';
-                          else label = 'Loss 😭';
+                          if (outcome == 'tie') {
+                            label = 'Tie 🤝';
+                          } else if (outcome == 'win') {
+                            label = 'Win 🏆';
+                          } else if (outcome == 'loss') {
+                            label = 'Loss 😭';
+                          } else {
+                            label = 'Match';
+                          }
 
                           return GlassCard(
                             padding: const EdgeInsets.all(14),
@@ -155,13 +178,34 @@ class BattleStatsPage extends ConsumerWidget {
                                         ),
                                       ),
                                       const SizedBox(height: 6),
-                                      Text(
-                                        'vs ${_short(oppId)}',
-                                        style: TextStyle(
-                                          color: Colors.white.withOpacity(0.72),
-                                          fontWeight: FontWeight.w700,
+                                      if (oppId.isEmpty)
+                                        Text(
+                                          'vs Unknown',
+                                          style: TextStyle(
+                                            color: Colors.white.withOpacity(0.72),
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        )
+                                      else
+                                        FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                                          future: db.collection('users').doc(oppId).get(),
+                                          builder: (context, profileSnap) {
+                                            final profile =
+                                                profileSnap.data?.data() ?? const <String, dynamic>{};
+                                            final displayId =
+                                                (profile['displayId'] ?? profile['username'])?.toString();
+                                            final name = (displayId != null && displayId.trim().isNotEmpty)
+                                                ? displayId.trim()
+                                                : _short(oppId);
+                                            return Text(
+                                              'vs $name',
+                                              style: TextStyle(
+                                                color: Colors.white.withOpacity(0.72),
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            );
+                                          },
                                         ),
-                                      ),
                                     ],
                                   ),
                                 ),

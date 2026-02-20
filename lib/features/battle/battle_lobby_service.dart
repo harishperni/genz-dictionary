@@ -85,7 +85,6 @@ class BattleLobbyService {
         'advanceAt': null,
 
         // ✅ result/stat fields
-        'resultSaved': false,
         'finishedAt': null,
         'winnerId': null,
         'finalHostScore': null,
@@ -233,7 +232,6 @@ class BattleLobbyService {
         'advanceAt': null,
 
         // ✅ reset result/stat fields for a fresh match
-        'resultSaved': false,
         'finishedAt': null,
         'winnerId': null,
         'finalHostScore': null,
@@ -428,7 +426,6 @@ class BattleLobbyService {
           'winnerId': winnerId,
           'finalHostScore': hostScore,
           'finalGuestScore': guestScore,
-          'resultSaved': false,
         });
       } else {
         tx.update(ref, {
@@ -492,114 +489,10 @@ class BattleLobbyService {
         'advanceAt': null,
 
         // reset result/stat fields
-        'resultSaved': false,
         'finishedAt': null,
         'winnerId': null,
         'finalHostScore': null,
         'finalGuestScore': null,
-      });
-    });
-  }
-
-  /// Saves finished battle result + updates per-user stats (idempotent).
-  Future<void> saveBattleResultIfNeeded({required String rawCode}) async {
-    final code = normalizeCode(rawCode);
-    final lobbyRef = _ref(code);
-
-    final historyRef = _db.collection('battle_history');
-    final statsRef = _db.collection('battle_stats');
-
-    await _db.runTransaction((tx) async {
-      final snap = await tx.get(lobbyRef);
-      if (!snap.exists) return;
-
-      final data = snap.data() ?? {};
-      final status = (data['status'] ?? '') as String;
-      if (status != 'finished') return;
-
-      // ✅ idempotent guard (don’t save twice)
-      final alreadySaved = (data['resultSaved'] ?? false) == true;
-      if (alreadySaved) return;
-
-      final hostId = (data['hostId'] ?? '') as String;
-      final guestId = (data['guestId'] ?? '') as String?;
-      if (hostId.isEmpty || guestId == null || guestId.isEmpty) return;
-
-      final scoresRaw = (data['scores'] as Map?) ?? {};
-      final hostScore =
-          (scoresRaw[hostId] is int) ? (scoresRaw[hostId] as int) : int.tryParse('${scoresRaw[hostId]}') ?? 0;
-      final guestScore =
-          (scoresRaw[guestId] is int) ? (scoresRaw[guestId] as int) : int.tryParse('${scoresRaw[guestId]}') ?? 0;
-
-      String winnerId = '';
-      if (hostScore > guestScore) {
-        winnerId = hostId;
-      } else if (guestScore > hostScore) {
-        winnerId = guestId;
-      } // else keep '' = tie
-
-      final finishedAt = FieldValue.serverTimestamp();
-
-      // 1) Write a single history record
-      final docId = '${code}_${DateTime.now().millisecondsSinceEpoch}';
-      final hRef = historyRef.doc(docId);
-
-      tx.set(hRef, {
-        'lobbyCode': code,
-        'hostId': hostId,
-        'guestId': guestId,
-        'hostScore': hostScore,
-        'guestScore': guestScore,
-        'winnerId': winnerId, // '' means tie
-        'players': [hostId, guestId],
-        'finishedAt': finishedAt,
-      });
-
-      // 2) Update per-user aggregate stats (battle_stats/{uid})
-      void bumpUser(
-        String uid, {
-        required bool isWin,
-        required bool isLoss,
-        required bool isTie,
-      }) {
-        final sRef = statsRef.doc(uid);
-
-        tx.set(
-          sRef,
-          {
-            'total': FieldValue.increment(1),
-            'wins': FieldValue.increment(isWin ? 1 : 0),
-            'losses': FieldValue.increment(isLoss ? 1 : 0),
-            'ties': FieldValue.increment(isTie ? 1 : 0),
-            'updatedAt': finishedAt,
-          },
-          SetOptions(merge: true),
-        );
-      }
-
-      final isTie = winnerId.isEmpty;
-
-      bumpUser(
-        hostId,
-        isWin: !isTie && winnerId == hostId,
-        isLoss: !isTie && winnerId != hostId,
-        isTie: isTie,
-      );
-
-      bumpUser(
-        guestId,
-        isWin: !isTie && winnerId == guestId,
-        isLoss: !isTie && winnerId != guestId,
-        isTie: isTie,
-      );
-
-      // 3) Mark lobby as saved so it never double-saves
-      tx.update(lobbyRef, {
-        'resultSaved': true,
-        'finishedAt': finishedAt,
-        'winnerId': winnerId.isEmpty ? null : winnerId,
-        'finalHostScore': hostScore,
-        'finalGuestScore': guestScore,
       });
     });
   }
