@@ -90,7 +90,7 @@ class BattleStatsPage extends ConsumerWidget {
                           Text(
                             'Win rate: $rate%',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.85),
+                              color: Colors.white.withValues(alpha: 0.85),
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -110,7 +110,7 @@ class BattleStatsPage extends ConsumerWidget {
                           child: Text(
                             'Error loading history:\n${snap.error}\n\n(If it mentions an index, open the link and create it.)',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.75),
+                              color: Colors.white.withValues(alpha: 0.75),
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -128,7 +128,7 @@ class BattleStatsPage extends ConsumerWidget {
                           child: Text(
                             'No battles saved yet.\nPlay a battle and come back here!',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.75),
+                              color: Colors.white.withValues(alpha: 0.75),
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -182,7 +182,7 @@ class BattleStatsPage extends ConsumerWidget {
                                         Text(
                                           'vs Unknown',
                                           style: TextStyle(
-                                            color: Colors.white.withOpacity(0.72),
+                                            color: Colors.white.withValues(alpha: 0.72),
                                             fontWeight: FontWeight.w700,
                                           ),
                                         )
@@ -200,7 +200,7 @@ class BattleStatsPage extends ConsumerWidget {
                                             return Text(
                                               'vs $name',
                                               style: TextStyle(
-                                                color: Colors.white.withOpacity(0.72),
+                                                color: Colors.white.withValues(alpha: 0.72),
                                                 fontWeight: FontWeight.w700,
                                               ),
                                             );
@@ -238,9 +238,9 @@ class BattleStatsPage extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.06),
+          color: Colors.white.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withOpacity(0.12)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
         ),
         child: Column(
           children: [
@@ -252,7 +252,7 @@ class BattleStatsPage extends ConsumerWidget {
             const SizedBox(height: 2),
             Text(label,
                 style: TextStyle(
-                    color: Colors.white.withOpacity(0.70),
+                    color: Colors.white.withValues(alpha: 0.70),
                     fontWeight: FontWeight.w700,
                     fontSize: 12)),
           ],

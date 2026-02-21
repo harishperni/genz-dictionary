@@ -44,14 +44,14 @@ class BattleMenuPage extends StatelessWidget {
                         children: [
                           Icon(
                             Icons.sports_kabaddi_rounded,
-                            color: Colors.white.withOpacity(0.85),
+                            color: Colors.white.withValues(alpha: 0.85),
                             size: 18,
                           ),
                           const SizedBox(width: 8),
                           Text(
                             'Battle',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.85),
+                              color: Colors.white.withValues(alpha: 0.85),
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -85,7 +85,7 @@ class BattleMenuPage extends StatelessWidget {
               Text(
                 'Challenge a friend to a slang-off.',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.70),
+                  color: Colors.white.withValues(alpha: 0.70),
                   fontWeight: FontWeight.w600,
                   fontSize: 16,
                 ),
@@ -170,7 +170,7 @@ class BattleMenuPage extends StatelessWidget {
                       ),
                     ),
                     style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: Colors.white.withOpacity(0.25)),
+                      side: BorderSide(color: Colors.white.withValues(alpha: 0.25)),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
@@ -186,7 +186,7 @@ class BattleMenuPage extends StatelessWidget {
                 child: Text(
                   '© 2026 Gen Z Dictionary',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.35),
+                    color: Colors.white.withValues(alpha: 0.35),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -268,7 +268,7 @@ class _ActionCard extends StatelessWidget {
           Text(
             subtitle,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.60),
+              color: Colors.white.withValues(alpha: 0.60),
               fontWeight: FontWeight.w600,
             ),
           ),

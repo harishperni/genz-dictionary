@@ -1,5 +1,6 @@
 // lib/features/battle/create_lobby_page.dart
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -34,6 +35,17 @@ class _CreateLobbyPageState extends ConsumerState<CreateLobbyPage> {
   }
 
   String get _uid => FirebaseAuth.instance.currentUser?.uid ?? 'demo_user_1';
+
+  Future<String> _displayName(String uid) async {
+    if (uid.trim().isEmpty) return '—';
+    final snap =
+        await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    final data = snap.data() ?? const <String, dynamic>{};
+    final raw = (data['displayId'] ?? data['username'] ?? '').toString().trim();
+    if (raw.isNotEmpty) return raw;
+    if (uid.length <= 8) return uid;
+    return '${uid.substring(0, 4)}...${uid.substring(uid.length - 2)}';
+  }
 
   Future<void> _createLobby() async {
     setState(() => _creating = true);
@@ -161,8 +173,16 @@ class _CreateLobbyPageState extends ConsumerState<CreateLobbyPage> {
                         ] else ...[
                           Text('Status: ${lobby.status}'),
                           const SizedBox(height: 10),
-                          Text('Host: ${lobby.hostId}'),
-                          Text('Guest: ${lobby.guestId ?? "—"}'),
+                          FutureBuilder<String>(
+                            future: _displayName(lobby.hostId),
+                            builder: (context, snap) =>
+                                Text('Host: ${snap.data ?? '...'}'),
+                          ),
+                          FutureBuilder<String>(
+                            future: _displayName(lobby.guestId ?? ''),
+                            builder: (context, snap) =>
+                                Text('Guest: ${snap.data ?? '—'}'),
+                          ),
                         ],
 
                         const SizedBox(height: 22),

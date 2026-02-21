@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,6 +28,7 @@ class BattleQuizPage extends ConsumerStatefulWidget {
 
 class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
   final BattleLobbyService _service = BattleLobbyService();
+  final Map<String, Future<String>> _nameCache = {};
 
   bool _submitted = false;
 
@@ -85,6 +87,20 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
     final diffMs = target.difference(_serverNow()).inMilliseconds;
     final s = (diffMs / 1000).ceil();
     return s < 0 ? 0 : s;
+  }
+
+  Future<String> _displayName(String uid) {
+    return _nameCache.putIfAbsent(uid, () async {
+      if (uid.trim().isEmpty) return '—';
+      final snap =
+          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      final data = snap.data() ?? const <String, dynamic>{};
+      final raw =
+          (data['displayId'] ?? data['username'] ?? '').toString().trim();
+      if (raw.isNotEmpty) return raw;
+      if (uid.length <= 8) return uid;
+      return '${uid.substring(0, 4)}...${uid.substring(uid.length - 2)}';
+    });
   }
 
   @override
@@ -169,9 +185,9 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
         child: Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.06),
+            color: Colors.white.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withOpacity(0.14)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -188,8 +204,19 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
               Text(
                 'Host: $hostScore   •   Guest: $guestScore',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.85),
+                  color: Colors.white.withValues(alpha: 0.85),
                   fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 6),
+              FutureBuilder<String>(
+                future: _displayName(isHostMe ? (lobby.guestId ?? '') : lobby.hostId),
+                builder: (context, snap) => Text(
+                  'Opponent: ${snap.data ?? '...'}',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
               const SizedBox(height: 18),
@@ -256,7 +283,7 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
                   child: Text(
                     'Waiting for host to start a rematch…',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.70),
+                      color: Colors.white.withValues(alpha: 0.70),
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -299,13 +326,13 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
           const SizedBox(height: 10),
           Text('Starting in ${secs}s',
               style: TextStyle(
-                  color: Colors.white.withOpacity(0.80),
+                  color: Colors.white.withValues(alpha: 0.80),
                   fontSize: 16,
                   fontWeight: FontWeight.w700)),
           const SizedBox(height: 22),
           Text('Both players will start together.',
               style: TextStyle(
-                  color: Colors.white.withOpacity(0.65),
+                  color: Colors.white.withValues(alpha: 0.65),
                   fontWeight: FontWeight.w700)),
         ],
       );
@@ -412,6 +439,36 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _topRow(hostScore: hostScore, guestScore: guestScore),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: FutureBuilder<String>(
+                    future: _displayName(lobby.hostId),
+                    builder: (context, snap) => Text(
+                      'Host: ${snap.data ?? '...'}',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.75),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: FutureBuilder<String>(
+                    future: _displayName(lobby.guestId ?? ''),
+                    builder: (context, snap) => Text(
+                      'Guest: ${snap.data ?? '—'}',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.75),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
 
             Row(
@@ -496,9 +553,9 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.08),
+            color: Colors.white.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withOpacity(0.12)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
           ),
           child: Text('What does “${entry.term}” mean?',
               style: const TextStyle(
@@ -525,15 +582,15 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
       reveal: reveal,
     );
 
-    Color borderColor = Colors.white.withOpacity(0.14);
-    Color fillColor = Colors.white.withOpacity(0.06);
+    Color borderColor = Colors.white.withValues(alpha: 0.14);
+    Color fillColor = Colors.white.withValues(alpha: 0.06);
 
     if (state == _OptionVisualState.correct) {
-      borderColor = Colors.greenAccent.withOpacity(0.9);
-      fillColor = Colors.greenAccent.withOpacity(0.18);
+      borderColor = Colors.greenAccent.withValues(alpha: 0.9);
+      fillColor = Colors.greenAccent.withValues(alpha: 0.18);
     } else if (state == _OptionVisualState.wrong) {
-      borderColor = Colors.redAccent.withOpacity(0.9);
-      fillColor = Colors.redAccent.withOpacity(0.16);
+      borderColor = Colors.redAccent.withValues(alpha: 0.9);
+      fillColor = Colors.redAccent.withValues(alpha: 0.16);
     }
 
     return InkWell(
@@ -566,9 +623,9 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.07),
+        color: Colors.white.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Row(
         children: [
@@ -588,9 +645,9 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.07),
+        color: Colors.white.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Row(
         children: [
@@ -606,9 +663,9 @@ class _BattleQuizPageState extends ConsumerState<BattleQuizPage> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.07),
+        color: Colors.white.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Row(
         children: [

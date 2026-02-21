@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -36,6 +37,17 @@ class _JoinLobbyPageState extends ConsumerState<JoinLobbyPage> {
 
   // ✅ safe uid (never crash)
   String get _uid => FirebaseAuth.instance.currentUser?.uid ?? 'demo_user_1';
+
+  Future<String> _displayName(String uid) async {
+    if (uid.trim().isEmpty) return '—';
+    final snap =
+        await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    final data = snap.data() ?? const <String, dynamic>{};
+    final raw = (data['displayId'] ?? data['username'] ?? '').toString().trim();
+    if (raw.isNotEmpty) return raw;
+    if (uid.length <= 8) return uid;
+    return '${uid.substring(0, 4)}...${uid.substring(uid.length - 2)}';
+  }
 
   Future<void> _joinLobby() async {
     final code = _service.normalizeCode(_codeController.text);
@@ -141,13 +153,13 @@ class _JoinLobbyPageState extends ConsumerState<JoinLobbyPage> {
               ),
               decoration: InputDecoration(
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.08),
+                fillColor: Colors.white.withValues(alpha: 0.08),
                 hintText: 'e.g. F7KJ9A',
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.4)),
                 counterText: '',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide(color: Colors.white.withOpacity(0.15)),
+                  borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -181,7 +193,7 @@ class _JoinLobbyPageState extends ConsumerState<JoinLobbyPage> {
               Text(
                 'Lobby: $code',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.75),
+                  color: Colors.white.withValues(alpha: 0.75),
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -194,7 +206,7 @@ class _JoinLobbyPageState extends ConsumerState<JoinLobbyPage> {
                 duration: const Duration(milliseconds: 350),
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
+                  color: Colors.white.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: Colors.white24),
                 ),
@@ -214,16 +226,26 @@ class _JoinLobbyPageState extends ConsumerState<JoinLobbyPage> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    Text("Host: ${_lobby!.hostId}",
-                        style: const TextStyle(color: Colors.white70)),
+                    FutureBuilder<String>(
+                      future: _displayName(_lobby!.hostId),
+                      builder: (context, snap) => Text(
+                        "Host: ${snap.data ?? '...'}",
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                    ),
                     if (_lobby!.guestId != null)
-                      Text("Guest: ${_lobby!.guestId}",
-                          style: const TextStyle(color: Colors.white70)),
+                      FutureBuilder<String>(
+                        future: _displayName(_lobby!.guestId ?? ''),
+                        builder: (context, snap) => Text(
+                          "Guest: ${snap.data ?? '...'}",
+                          style: const TextStyle(color: Colors.white70),
+                        ),
+                      ),
                     const SizedBox(height: 10),
                     if (_lobby!.status != 'started')
                       Text(
                         'Waiting for host to start…',
-                        style: TextStyle(color: Colors.white.withOpacity(0.65)),
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.65)),
                       ),
                   ],
                 ),
