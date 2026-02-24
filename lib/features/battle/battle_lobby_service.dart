@@ -5,6 +5,7 @@ import 'battle_lobby_model.dart';
 class BattleLobbyService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   static const String _collection = 'battle_lobbies';
+  static const Duration _resumeWindow = Duration(minutes: 5);
 
   DocumentReference<Map<String, dynamic>> _ref(String code) =>
       _db.collection(_collection).doc(code);
@@ -18,6 +19,81 @@ class BattleLobbyService {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no O/0/I/1
     final r = Random.secure();
     return List.generate(6, (_) => chars[r.nextInt(chars.length)]).join();
+  }
+
+  int _statusPriority(String status) {
+    switch (status) {
+      case 'started':
+        return 3;
+      case 'active':
+        return 2;
+      default:
+        return 0;
+    }
+  }
+
+  DateTime _bestTimestamp(Map<String, dynamic> data) {
+    final updatedAt = data['updatedAt'];
+    if (updatedAt is Timestamp) return updatedAt.toDate();
+    final startedAt = data['startedAt'];
+    if (startedAt is Timestamp) return startedAt.toDate();
+    final battleStartsAt = data['battleStartsAt'];
+    if (battleStartsAt is Timestamp) return battleStartsAt.toDate();
+    final createdAt = data['createdAt'];
+    if (createdAt is Timestamp) return createdAt.toDate();
+    return DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  /// Finds a lobby code the user can resume from Battle Menu.
+  /// Deterministic priority:
+  /// 1) status started > active
+  /// 2) most recent timestamp among updatedAt/startedAt/battleStartsAt/createdAt
+  /// 3) only if match is 2-player and updated within last 5 minutes
+  Future<String?> findResumableLobbyCode(String userId) async {
+    if (userId.trim().isEmpty) return null;
+
+    final hostSnap = await _db
+        .collection(_collection)
+        .where('hostId', isEqualTo: userId)
+        .limit(30)
+        .get();
+    final guestSnap = await _db
+        .collection(_collection)
+        .where('guestId', isEqualTo: userId)
+        .limit(30)
+        .get();
+
+    final byId = <String, QueryDocumentSnapshot<Map<String, dynamic>>>{};
+    for (final d in hostSnap.docs) {
+      byId[d.id] = d;
+    }
+    for (final d in guestSnap.docs) {
+      byId[d.id] = d;
+    }
+
+    QueryDocumentSnapshot<Map<String, dynamic>>? bestDoc;
+    var bestPriority = -1;
+    var bestTime = DateTime.fromMillisecondsSinceEpoch(0);
+
+    for (final doc in byId.values) {
+      final data = doc.data();
+      final status = (data['status'] ?? '').toString();
+      final p = _statusPriority(status);
+      if (p == 0) continue;
+      final guestId = (data['guestId'] ?? '').toString().trim();
+      if (guestId.isEmpty) continue;
+
+      final t = _bestTimestamp(data);
+      if (DateTime.now().difference(t) > _resumeWindow) continue;
+      final isBetter = p > bestPriority || (p == bestPriority && t.isAfter(bestTime));
+      if (isBetter) {
+        bestPriority = p;
+        bestTime = t;
+        bestDoc = doc;
+      }
+    }
+
+    return bestDoc?.id;
   }
 
   /// ✅ Estimate server clock offset so all devices can align to server-based time.
@@ -65,6 +141,7 @@ class BattleLobbyService {
         'currentIndex': 0,
         'scores': {userId: 0},
         'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
         'startedAt': null,
 
         // Phase 2+ fields
@@ -127,6 +204,7 @@ class BattleLobbyService {
         'guestId': userId,
         'status': 'active',
         'scores': scores,
+        'updatedAt': FieldValue.serverTimestamp(),
       });
 
       return true;
@@ -214,6 +292,7 @@ class BattleLobbyService {
       tx.update(ref, {
         'status': 'started',
         'startedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
         'currentIndex': 0,
         'scores': scores,
 
@@ -301,6 +380,7 @@ class BattleLobbyService {
       final updates = <String, dynamic>{
         'answers': answers,
         'scores': scores,
+        'updatedAt': FieldValue.serverTimestamp(),
       };
 
       // ✅ Instead of immediate advance: lock + set advanceAt (reveal delay)
@@ -345,6 +425,7 @@ class BattleLobbyService {
 
       final updates = <String, dynamic>{
         'locked': locked,
+        'updatedAt': FieldValue.serverTimestamp(),
       };
 
       if (data['advanceAt'] == null) {
@@ -421,6 +502,7 @@ class BattleLobbyService {
 
         tx.update(ref, {
           'status': 'finished',
+          'updatedAt': FieldValue.serverTimestamp(),
           'advanceAt': null,
           'finishedAt': FieldValue.serverTimestamp(),
           'winnerId': winnerId,
@@ -431,6 +513,7 @@ class BattleLobbyService {
         tx.update(ref, {
           'currentIndex': next,
           'questionStartedAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
           'advanceAt': null,
         });
       }
@@ -475,6 +558,7 @@ class BattleLobbyService {
       // reset scores + state
       tx.update(ref, {
         'status': 'active', // ready to startBattle again
+        'updatedAt': FieldValue.serverTimestamp(),
         'questions': q,
         'currentIndex': 0,
         'scores': {hostId: 0, guestId: 0},

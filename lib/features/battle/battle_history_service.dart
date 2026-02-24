@@ -104,6 +104,8 @@ class BattleHistoryService {
           'totalCorrect': FieldValue.increment(myScoreFor(uid)),
           'totalQuestions': FieldValue.increment(questionCount),
           'lastBattleAt': FieldValue.serverTimestamp(),
+          'lastLobbyCode': lobbyCode,
+          'participants': [hostId, guestId],
         }, SetOptions(merge: true));
       }
 

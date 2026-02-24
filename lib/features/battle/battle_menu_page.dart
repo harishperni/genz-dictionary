@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:genz_dictionary/theme/glass_widgets.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'battle_lobby_service.dart';
 
 class BattleMenuPage extends StatelessWidget {
   final String userId;
@@ -143,6 +144,43 @@ class BattleMenuPage extends StatelessWidget {
               ),
 
               const SizedBox(height: 16),
+
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: FutureBuilder<String?>(
+                  future: BattleLobbyService().findResumableLobbyCode(userId),
+                  builder: (context, snap) {
+                    if (!snap.hasData || snap.data == null) {
+                      return const SizedBox.shrink();
+                    }
+                    final code = snap.data!;
+                    return SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          context.pushNamed(
+                            'battle_quiz',
+                            pathParameters: {'code': code},
+                            extra: userId,
+                          );
+                        },
+                        icon: const Icon(Icons.play_circle_fill_rounded),
+                        label: Text('Resume Match ($code)'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF34D399),
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 12),
 
               // ✅ Battle Stats button (placed OUTSIDE the LayoutBuilder)
               Padding(

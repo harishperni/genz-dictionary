@@ -1,0 +1,142 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function validDisplayId(data) {
+      return !('displayId' in data) || (
+        data.displayId is string &&
+        data.displayId.size() >= 3 &&
+        data.displayId.size() <= 20 &&
+        data.displayId.matches('^[A-Za-z0-9_]+$') &&
+        ('displayIdLower' in data) &&
+        data.displayIdLower is string &&
+        data.displayIdLower.size() >= 3 &&
+        data.displayIdLower.size() <= 20 &&
+        data.displayIdLower.matches('^[a-z0-9_]+$')
+      );
+    }
+
+    // If one profile-id field changes, the other must change too.
+    function displayFieldsMoveTogether(oldData, newData) {
+      return (
+        oldData.displayId == newData.displayId &&
+        oldData.displayIdLower == newData.displayIdLower
+      ) || (
+        oldData.displayId != newData.displayId &&
+        oldData.displayIdLower != newData.displayIdLower
+      );
+    }
+
+    function lobbyData(code) {
+      return get(/databases/$(database)/documents/battle_lobbies/$(code)).data;
+    }
+
+    function lobbyMatchesFinished(code, hostId, guestId) {
+      let lobby = lobbyData(code);
+      return lobby.hostId == hostId &&
+        lobby.guestId == guestId &&
+        lobby.status == 'finished';
+    }
+
+    function lobbyMatchesParticipants(code, participants) {
+      let lobby = lobbyData(code);
+      return participants.size() == 2 &&
+        participants.hasAll([lobby.hostId, lobby.guestId]) &&
+        lobby.status == 'finished';
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow create: if isOwner(uid) && validDisplayId(request.resource.data);
+      allow update: if isOwner(uid) &&
+        validDisplayId(request.resource.data) &&
+        displayFieldsMoveTogether(resource.data, request.resource.data);
+      allow delete: if false;
+    }
+
+    match /users/{uid}/battle_history/{battleId} {
+      allow read: if isOwner(uid);
+      allow create, update: if signedIn() &&
+        request.resource.data.uid == uid &&
+        request.resource.data.hostId is string &&
+        request.resource.data.guestId is string &&
+        (request.auth.uid == request.resource.data.hostId ||
+          request.auth.uid == request.resource.data.guestId) &&
+        (uid == request.resource.data.hostId ||
+          uid == request.resource.data.guestId) &&
+        request.resource.data.lobbyCode is string &&
+        lobbyMatchesFinished(
+          request.resource.data.lobbyCode,
+          request.resource.data.hostId,
+          request.resource.data.guestId
+        );
+      allow delete: if false;
+    }
+
+    match /users/{uid}/battle_stats/{docId} {
+      allow read: if isOwner(uid);
+      allow create, update: if signedIn() &&
+        docId == 'main' &&
+        request.resource.data.lastLobbyCode is string &&
+        request.resource.data.participants is list &&
+        request.resource.data.participants.hasAll([uid, request.auth.uid]) &&
+        lobbyMatchesParticipants(
+          request.resource.data.lastLobbyCode,
+          request.resource.data.participants
+        );
+      allow delete: if false;
+    }
+
+    match /battle_lobbies/{code} {
+      allow read: if signedIn();
+
+      allow create: if (code == '_time_sync' && signedIn()) || (
+        signedIn() &&
+        request.resource.data.hostId == request.auth.uid &&
+        request.resource.data.guestId == null &&
+        request.resource.data.status == 'waiting'
+      );
+
+      allow update: if (code == '_time_sync' && signedIn()) ||
+        (signedIn() && validBattleLobbyUpdate());
+      allow delete: if false;
+
+      function validBattleLobbyUpdate() {
+        let old = resource.data;
+        let next = request.resource.data;
+        let isHost = old.hostId == request.auth.uid;
+        let isJoiner = old.guestId == null && next.guestId == request.auth.uid;
+        let guestImmutable = old.guestId == null
+          ? (next.guestId == null || next.guestId == request.auth.uid)
+          : next.guestId == old.guestId;
+        let statusAllowed = (next.status == old.status) ||
+          isHost ||
+          (isJoiner && next.status == 'active');
+
+        // Non-participant joiners can only attach themselves to an unstarted lobby.
+        let joinSafe = !isJoiner || (
+          old.status != 'started' &&
+          old.status != 'finished' &&
+          next.currentIndex == old.currentIndex &&
+          next.questions == old.questions &&
+          next.answers == old.answers &&
+          next.locked == old.locked &&
+          next.options == old.options
+        );
+
+        return ((old.hostId == request.auth.uid || old.guestId == request.auth.uid) || isJoiner) &&
+          next.hostId == old.hostId &&
+          guestImmutable &&
+          statusAllowed &&
+          joinSafe;
+      }
+    }
+  }
+}
