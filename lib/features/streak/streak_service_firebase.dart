@@ -142,6 +142,9 @@ class StreakServiceFirebase {
   static const String bShared50 = 'shared_50';
   static const String bInvite1 = 'invite_1';
   static const String bInvite5 = 'invite_5';
+  static const String bChallenge1 = 'challenge_1';
+  static const String bChallenge7 = 'challenge_7';
+  static const String bLoot1 = 'loot_1';
 
   // ⏰ Behavior
   static const String bEarlyBird = 'early_bird';
@@ -349,6 +352,47 @@ Future<void> trackWordViewed(String term) async {
     final ref = _doc();
     await _db.runTransaction((tx) async {
       _addXPInTx(tx, ref, 1); // +1 XP per correct answer
+    });
+  }
+
+  Future<void> trackDailyChallengeComplete() async {
+    final ref = _doc();
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      final data = snap.data() ?? const <String, dynamic>{};
+      final count = ((data['dailyChallengesCompleted'] ?? 0) as num).toInt() + 1;
+      tx.update(ref, {
+        'dailyChallengesCompleted': count,
+        'lastChallengeAt': FieldValue.serverTimestamp(),
+      });
+      _addXPInTx(tx, ref, 20);
+      if (count >= 1) _addBadgeInTx(tx, ref, bChallenge1);
+      if (count >= 7) _addBadgeInTx(tx, ref, bChallenge7);
+    });
+  }
+
+  Future<void> trackInviteSent() async {
+    final ref = _doc();
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      final data = snap.data() ?? const <String, dynamic>{};
+      final invites = ((data['invitesSent'] ?? 0) as num).toInt() + 1;
+      tx.update(ref, {'invitesSent': invites});
+      _addXPInTx(tx, ref, 5);
+      if (invites >= 1) _addBadgeInTx(tx, ref, bInvite1);
+      if (invites >= 5) _addBadgeInTx(tx, ref, bInvite5);
+    });
+  }
+
+  Future<void> trackLootOpened({required int xpAwarded}) async {
+    final ref = _doc();
+    await _db.runTransaction((tx) async {
+      tx.update(ref, {
+        'lootOpenedCount': FieldValue.increment(1),
+        'lastLootAt': FieldValue.serverTimestamp(),
+      });
+      _addXPInTx(tx, ref, xpAwarded);
+      _addBadgeInTx(tx, ref, bLoot1);
     });
   }
 

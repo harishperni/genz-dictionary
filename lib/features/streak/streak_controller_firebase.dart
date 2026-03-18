@@ -48,6 +48,11 @@ class StreakFBController extends StateNotifier<StreakFB> {
   Future<void> trackWordViewed(String term) => service.trackWordViewed(term);
   Future<void> trackShared() => service.trackShared();
   Future<void> trackQuizXP() => service.trackQuizXP();
+  Future<void> trackDailyChallengeComplete() =>
+      service.trackDailyChallengeComplete();
+  Future<void> trackInviteSent() => service.trackInviteSent();
+  Future<void> trackLootOpened({required int xpAwarded}) =>
+      service.trackLootOpened(xpAwarded: xpAwarded);
 
   // Debug helpers
   Future<void> recomputeToday() => service.touchToday();

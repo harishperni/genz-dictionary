@@ -6,8 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'package:genz_dictionary/features/slang/app/slang_providers.dart';
+import '../streak/streak_controller_firebase.dart';
 import 'battle_lobby_service.dart';
 import 'battle_lobby_model.dart';
 
@@ -124,6 +126,15 @@ class _CreateLobbyPageState extends ConsumerState<CreateLobbyPage> {
     }
   }
 
+  Future<void> _shareInvite(String code) async {
+    const appLink = 'https://genzdictionary.app/invite';
+    final text = 'Join my GenZ battle!\nCode: $code\n$appLink?code=$code';
+    final result = await Share.share(text);
+    if (result.status == ShareResultStatus.success) {
+      await ref.read(streakFBProvider.notifier).trackInviteSent();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final code = _code;
@@ -165,6 +176,15 @@ class _CreateLobbyPageState extends ConsumerState<CreateLobbyPage> {
                           data: code,
                           size: 200,
                           backgroundColor: Colors.white,
+                        ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () => _shareInvite(code),
+                            icon: const Icon(Icons.share_rounded),
+                            label: const Text('Share Invite Link'),
+                          ),
                         ),
                         const SizedBox(height: 16),
 

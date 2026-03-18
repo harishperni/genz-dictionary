@@ -21,6 +21,7 @@ class SearchPage extends ConsumerStatefulWidget {
 
 class _SearchPageState extends ConsumerState<SearchPage> {
   final TextEditingController _controller = TextEditingController();
+  final TextEditingController _challengeController = TextEditingController();
   final Map<String, String> _hayCache = {};
   final GlobalKey<XPProgressBarState> xpBarKey = GlobalKey<XPProgressBarState>();
 
@@ -41,6 +42,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   void dispose() {
     _debounce?.cancel();
     _controller.dispose();
+    _challengeController.dispose();
     super.dispose();
   }
 
@@ -61,16 +63,28 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     });
   }
 
-  Future<void> _completeChallenge(SlangEntry entry) async {
+  Future<void> _completeChallenge(SlangEntry entry, String sentence) async {
     if (_challengeDoneToday) return;
+    final s = sentence.trim();
+    if (s.length < 8 || !s.toLowerCase().contains(entry.term.toLowerCase())) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Write a sentence using "${entry.term}" first.'),
+        ),
+      );
+      return;
+    }
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_todayKey(), true);
+    await prefs.setString('${_todayKey()}_text', s);
 
     if (!mounted) return;
     setState(() => _challengeDoneToday = true);
 
     await ref.read(streakFBProvider.notifier).trackWordViewed(entry.term);
+    await ref.read(streakFBProvider.notifier).trackDailyChallengeComplete();
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -202,6 +216,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                             onTapQuiz: () => context.pushNamed('quiz'),
                             onTapLeaderboard: () => context.pushNamed('leaderboard'),
                             onTapSubmitSlang: () => context.pushNamed('submit_slang'),
+                            onTapHub: () => context.pushNamed('growth_hub'),
                           ),
                           const SizedBox(height: 12),
                           const StreakBanner(),
@@ -223,7 +238,11 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                                           DateTime.now().day) %
                                       all.length],
                               done: _challengeDoneToday,
-                              onComplete: _completeChallenge,
+                              inputController: _challengeController,
+                              onComplete: (entry) => _completeChallenge(
+                                entry,
+                                _challengeController.text,
+                              ),
                             ),
                           const SizedBox(height: 10),
                           _TrendingTags(
@@ -397,6 +416,7 @@ class _ActionScroller extends StatelessWidget {
   final VoidCallback onTapQuiz;
   final VoidCallback onTapLeaderboard;
   final VoidCallback onTapSubmitSlang;
+  final VoidCallback onTapHub;
 
   const _ActionScroller({
     required this.onTapBadges,
@@ -404,6 +424,7 @@ class _ActionScroller extends StatelessWidget {
     required this.onTapQuiz,
     required this.onTapLeaderboard,
     required this.onTapSubmitSlang,
+    required this.onTapHub,
   });
 
   @override
@@ -421,6 +442,8 @@ class _ActionScroller extends StatelessWidget {
           _ActionChip(label: 'Leaderboard', icon: Icons.leaderboard_rounded, accent: const Color(0xFF38BDF8), onTap: onTapLeaderboard),
           const SizedBox(width: 8),
           _ActionChip(label: 'Submit Slang', icon: Icons.edit_note_rounded, accent: const Color(0xFF34D399), onTap: onTapSubmitSlang),
+          const SizedBox(width: 8),
+          _ActionChip(label: 'GenZ+', icon: Icons.auto_awesome_rounded, accent: const Color(0xFFFDE047), onTap: onTapHub),
         ],
       ),
     );
@@ -591,11 +614,13 @@ class _SlangOfDayCard extends StatelessWidget {
 class _DailyChallengeCard extends StatelessWidget {
   final SlangEntry? entry;
   final bool done;
+  final TextEditingController inputController;
   final ValueChanged<SlangEntry> onComplete;
 
   const _DailyChallengeCard({
     required this.entry,
     required this.done,
+    required this.inputController,
     required this.onComplete,
   });
 
@@ -634,6 +659,17 @@ class _DailyChallengeCard extends StatelessWidget {
             style: TextStyle(
               color: Colors.white.withOpacity(0.88),
               fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: inputController,
+            minLines: 1,
+            maxLines: 3,
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            decoration: InputDecoration(
+              hintText: 'Type your sentence...',
+              hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
             ),
           ),
           const SizedBox(height: 10),

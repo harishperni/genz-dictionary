@@ -51,8 +51,18 @@ class _SubmitSlangPageState extends State<SubmitSlangPage> {
 
     setState(() => _saving = true);
     try {
+      final profile =
+          await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final p = profile.data() ?? const <String, dynamic>{};
+      final city = (p['city'] ?? '').toString().trim();
+      final campus = (p['campus'] ?? '').toString().trim();
+      final creator = (p['displayId'] ?? '').toString().trim();
+
       await FirebaseFirestore.instance.collection('community_submissions').add({
         'uid': user.uid,
+        'creator': creator,
+        'city': city,
+        'campus': campus,
         'term': _term.text.trim(),
         'meaning': _meaning.text.trim(),
         'example': _example.text.trim(),

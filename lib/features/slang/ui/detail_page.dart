@@ -11,6 +11,8 @@ import '../../../theme/app_theme.dart';
 // ✅ for usage/badges tracking
 import '../../streak/streak_controller_firebase.dart';
 
+enum _MemeTemplate { neon, sunset, monochrome }
+
 class DetailPage extends ConsumerStatefulWidget {
   final String term;
   const DetailPage({super.key, required this.term});
@@ -22,6 +24,7 @@ class DetailPage extends ConsumerStatefulWidget {
 class _DetailPageState extends ConsumerState<DetailPage> {
   final controller = ScreenshotController();
   bool _trackedView = false;
+  _MemeTemplate _template = _MemeTemplate.neon;
 
   @override
   Widget build(BuildContext context) {
@@ -70,7 +73,38 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                   .trackWordViewed(widget.term));
             }
 
-            return _VisibleContent(entry: e, controller: controller);
+            return Column(
+              children: [
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: Row(
+                    children: [
+                      _TemplateChip(
+                        label: 'Neon',
+                        selected: _template == _MemeTemplate.neon,
+                        onTap: () => setState(() => _template = _MemeTemplate.neon),
+                      ),
+                      const SizedBox(width: 8),
+                      _TemplateChip(
+                        label: 'Sunset',
+                        selected: _template == _MemeTemplate.sunset,
+                        onTap: () => setState(() => _template = _MemeTemplate.sunset),
+                      ),
+                      const SizedBox(width: 8),
+                      _TemplateChip(
+                        label: 'Mono',
+                        selected: _template == _MemeTemplate.monochrome,
+                        onTap: () =>
+                            setState(() => _template = _MemeTemplate.monochrome),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Expanded(child: _VisibleContent(entry: e, controller: controller)),
+              ],
+            );
           },
           error: (e, st) => Center(child: Text('Error: $e')),
           loading: () => const Center(child: CircularProgressIndicator()),
@@ -86,7 +120,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
     SlangEntry e,
   ) async {
     final imgBytes = await controller.captureFromWidget(
-      _ShareCard(entry: e),
+      _ShareCard(entry: e, template: _template),
       pixelRatio: ui.window.devicePixelRatio.clamp(2.0, 3.0),
     );
 
@@ -133,25 +167,92 @@ class _VisibleContent extends StatelessWidget {
 /// Off-screen, share-ready card (RECTANGULAR, OPAQUE)
 class _ShareCard extends StatelessWidget {
   final SlangEntry entry;
-  const _ShareCard({required this.entry});
+  final _MemeTemplate template;
+
+  const _ShareCard({required this.entry, required this.template});
 
   @override
   Widget build(BuildContext context) {
-    const bg = Color(0xFF0D1021);
+    final bg = switch (template) {
+      _MemeTemplate.neon => const Color(0xFF0D1021),
+      _MemeTemplate.sunset => const Color(0xFF2B0C2F),
+      _MemeTemplate.monochrome => const Color(0xFF121212),
+    };
+    final accent = switch (template) {
+      _MemeTemplate.neon => const Color(0xFF22D3EE),
+      _MemeTemplate.sunset => const Color(0xFFFF7B54),
+      _MemeTemplate.monochrome => const Color(0xFFE5E7EB),
+    };
+
     return Container(
       color: bg,
       padding: const EdgeInsets.all(24),
       width: 1080,
       child: DefaultTextStyle(
         style: const TextStyle(color: Colors.white),
-        child: _CardBody(
-          entry: entry,
-          titleStyle: const TextStyle(fontSize: 56, fontWeight: FontWeight.w900),
-          meaningStyle: const TextStyle(fontSize: 30, height: 1.25),
-          exampleStyle: const TextStyle(fontSize: 28),
-          tagChipOpacity: 0.12,
-          emojiSize: 44,
-          quoteIcon: Icons.format_quote_rounded,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _CardBody(
+              entry: entry,
+              titleStyle: TextStyle(
+                fontSize: 56,
+                fontWeight: FontWeight.w900,
+                color: accent,
+              ),
+              meaningStyle: const TextStyle(fontSize: 30, height: 1.25),
+              exampleStyle: const TextStyle(fontSize: 28),
+              tagChipOpacity: 0.12,
+              emojiSize: 44,
+              quoteIcon: Icons.format_quote_rounded,
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Made with Gen Z Dictionary • genzdictionary.app',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.75),
+                fontWeight: FontWeight.w700,
+                fontSize: 24,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TemplateChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _TemplateChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected
+              ? const Color(0xFF22D3EE).withOpacity(0.28)
+              : Colors.white.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withOpacity(0.16)),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
     );

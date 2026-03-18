@@ -103,10 +103,15 @@ const _allBadges = <_BadgeSpec>[
   // Behavior / Misc
   _BadgeSpec(id: StreakServiceFirebase.bFirstClaim,     title: 'Treasure Hunter',  desc: 'Claimed a reward',      emoji: '🗝️'),
   _BadgeSpec(id: StreakServiceFirebase.bShared1,        title: 'Spreader',         desc: 'Shared a slang',        emoji: '📢'),
+  _BadgeSpec(id: StreakServiceFirebase.bInvite1,        title: 'First Inviter',    desc: 'Sent 1 battle invite',  emoji: '🫱'),
+  _BadgeSpec(id: StreakServiceFirebase.bInvite5,        title: 'Squad Builder',    desc: 'Sent 5 invites',        emoji: '🤝'),
   _BadgeSpec(id: StreakServiceFirebase.bEarlyBird,      title: 'Early Bird',       desc: 'Opened app before 7am', emoji: '🌞'),
   _BadgeSpec(id: StreakServiceFirebase.bNightOwl,       title: 'Night Owl',        desc: 'Opened app after 11pm', emoji: '🌙'),
   _BadgeSpec(id: StreakServiceFirebase.bWeekendWarrior, title: 'Weekend Warrior',  desc: 'Active Sat & Sun',      emoji: '🎉'),
   _BadgeSpec(id: StreakServiceFirebase.bComebackKid,    title: 'Comeback Kid',     desc: 'Returned after a break',emoji: '🔄'),
+  _BadgeSpec(id: StreakServiceFirebase.bChallenge1,     title: 'Prompt Starter',   desc: 'Complete 1 daily challenge', emoji: '✍️'),
+  _BadgeSpec(id: StreakServiceFirebase.bChallenge7,     title: 'Challenge Streak', desc: 'Complete 7 challenges', emoji: '🧩'),
+  _BadgeSpec(id: StreakServiceFirebase.bLoot1,          title: 'Loot Rookie',      desc: 'Opened your first loot box', emoji: '🎁'),
 ];
 
 class _BadgeCard extends StatelessWidget {

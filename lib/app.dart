@@ -11,6 +11,14 @@ import 'features/slang/ui/favorites_page.dart';
 import 'features/slang/ui/quiz_page.dart';
 import 'features/social/leaderboard_page.dart';
 import 'features/community/submit_slang_page.dart';
+import 'features/community/community_feed_page.dart';
+import 'features/community/moderation_queue_page.dart';
+import 'features/growth/growth_hub_page.dart';
+import 'features/growth/ai_slang_coach_page.dart';
+import 'features/growth/persona_quiz_page.dart';
+import 'features/growth/daily_missions_page.dart';
+import 'features/growth/trends_near_me_page.dart';
+import 'features/growth/creator_packs_page.dart';
 
 // 🏅 Streaks & Badges
 import 'features/streak/badges_page.dart';
@@ -110,6 +118,46 @@ class MyApp extends ConsumerWidget {
               path: 'submit-slang',
               name: 'submit_slang',
               builder: (context, state) => const SubmitSlangPage(),
+            ),
+            GoRoute(
+              path: 'growth-hub',
+              name: 'growth_hub',
+              builder: (context, state) => const GrowthHubPage(),
+            ),
+            GoRoute(
+              path: 'ai-coach',
+              name: 'ai_coach',
+              builder: (context, state) => const AISlangCoachPage(),
+            ),
+            GoRoute(
+              path: 'persona-quiz',
+              name: 'persona_quiz',
+              builder: (context, state) => const PersonaQuizPage(),
+            ),
+            GoRoute(
+              path: 'daily-missions',
+              name: 'daily_missions',
+              builder: (context, state) => const DailyMissionsPage(),
+            ),
+            GoRoute(
+              path: 'trends-near-me',
+              name: 'trends_near_me',
+              builder: (context, state) => const TrendsNearMePage(),
+            ),
+            GoRoute(
+              path: 'creator-packs',
+              name: 'creator_packs',
+              builder: (context, state) => const CreatorPacksPage(),
+            ),
+            GoRoute(
+              path: 'community-feed',
+              name: 'community_feed',
+              builder: (context, state) => const CommunityFeedPage(),
+            ),
+            GoRoute(
+              path: 'moderation',
+              name: 'moderation',
+              builder: (context, state) => const ModerationQueuePage(),
             ),
 
             /// ⚔️ Battle menu + children

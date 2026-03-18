@@ -12,6 +12,8 @@ class ProfileSetupPage extends StatefulWidget {
 
 class _ProfileSetupPageState extends State<ProfileSetupPage> {
   final _controller = TextEditingController();
+  final _cityController = TextEditingController();
+  final _campusController = TextEditingController();
   bool _saving = false;
   bool _prefilled = false;
 
@@ -32,12 +34,16 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
       if (existing.isNotEmpty) {
         _controller.text = existing;
       }
+      _cityController.text = (snap.data()?['city'] ?? '').toString().trim();
+      _campusController.text = (snap.data()?['campus'] ?? '').toString().trim();
     });
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _cityController.dispose();
+    _campusController.dispose();
     super.dispose();
   }
 
@@ -85,6 +91,8 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
       await db.collection('users').doc(uid).set({
         'displayId': displayId,
         'displayIdLower': lower,
+        'city': _cityController.text.trim(),
+        'campus': _campusController.text.trim(),
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
@@ -131,6 +139,25 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
             const Text(
               '3-20 chars, letters/numbers/underscore only.',
               style: TextStyle(color: Colors.white70),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _cityController,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(
+                hintText: 'City (optional)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _campusController,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _save(),
+              decoration: const InputDecoration(
+                hintText: 'Campus / School (optional)',
+                border: OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 20),
             SizedBox(
