@@ -32,23 +32,8 @@ Future<void> main() async {
   // ✅ Init notifications + FCM
   await PushService.init();
 
-  // ✅ Wire up background and foreground message handling
+  // ✅ Wire up background handling (foreground/tap listeners are inside PushService.init)
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  FirebaseMessaging.onMessage.listen((RemoteMessage m) {
-    PushService.showForegroundNotification(m);
-  });
-  FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage m) {
-    // optional: route handling later
-  });
-
-  // ✅ Schedule daily push reminder asynchronously
-  Future.microtask(() async {
-    try {
-      await PushService.ensureDailyNudgeScheduledOnce();
-    } catch (_) {
-      // ignore errors silently
-    }
-  });
 
   // ✅ Finally run app
   runApp(const ProviderScope(child: MyApp())); // ✅ your current class name

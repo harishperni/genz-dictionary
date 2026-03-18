@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_native_timezone/flutter_native_timezone.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
@@ -229,9 +230,9 @@ class PushService {
     if (_tzReady) return;
     final sw = Stopwatch()..start();
     tzdata.initializeTimeZones(); // heavy; do once
-    final now = DateTime.now();
     try {
-      tz.setLocalLocation(tz.getLocation(now.timeZoneName));
+      final nativeTz = await FlutterNativeTimezone.getLocalTimezone();
+      tz.setLocalLocation(tz.getLocation(nativeTz));
     } catch (_) {
       tz.setLocalLocation(tz.getLocation('UTC'));
     }

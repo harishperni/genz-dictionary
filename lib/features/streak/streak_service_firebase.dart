@@ -248,7 +248,12 @@ Future<StreakFB> touchToday() async {
     } else if (today.weekday == DateTime.sunday) {
       _addBadgeInTx(tx, ref, 'wknd_sun');
     }
-    _tryUnlockWeekendWarrior(tx, ref);
+    _tryUnlockWeekendWarrior(
+      tx,
+      ref,
+      existingBadges: cur.badgesUnlocked,
+      weekday: today.weekday,
+    );
 
     return StreakFB.fromMap(next);
   });
@@ -403,13 +408,18 @@ Future<void> trackWordViewed(String term) async {
   void _tryUnlockWeekendWarrior(
     Transaction tx,
     DocumentReference<Map<String, dynamic>> ref,
+    {
+    required List<String> existingBadges,
+    required int weekday,
+    }
   ) {
-    tx.update(ref, {
-      'badgesUnlocked': FieldValue.arrayRemove(['wknd_sat', 'wknd_sun']),
-    });
-    tx.update(ref, {
-      'badgesUnlocked': FieldValue.arrayUnion([bWeekendWarrior]),
-    });
+    final hasSat =
+        existingBadges.contains('wknd_sat') || weekday == DateTime.saturday;
+    final hasSun =
+        existingBadges.contains('wknd_sun') || weekday == DateTime.sunday;
+    if (hasSat && hasSun) {
+      _addBadgeInTx(tx, ref, bWeekendWarrior);
+    }
   }
 
 
