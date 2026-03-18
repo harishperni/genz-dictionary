@@ -9,6 +9,8 @@ import 'features/slang/ui/search_page.dart';
 import 'features/slang/ui/detail_page.dart';
 import 'features/slang/ui/favorites_page.dart';
 import 'features/slang/ui/quiz_page.dart';
+import 'features/social/leaderboard_page.dart';
+import 'features/community/submit_slang_page.dart';
 
 // 🏅 Streaks & Badges
 import 'features/streak/badges_page.dart';
@@ -98,6 +100,16 @@ class MyApp extends ConsumerWidget {
               path: 'badges',
               name: 'badges',
               builder: (context, state) => const BadgesPage(),
+            ),
+            GoRoute(
+              path: 'leaderboard',
+              name: 'leaderboard',
+              builder: (context, state) => const LeaderboardPage(),
+            ),
+            GoRoute(
+              path: 'submit-slang',
+              name: 'submit_slang',
+              builder: (context, state) => const SubmitSlangPage(),
             ),
 
             /// ⚔️ Battle menu + children

@@ -138,5 +138,17 @@ service cloud.firestore {
           joinSafe;
       }
     }
+
+    match /community_submissions/{submissionId} {
+      allow create: if signedIn() &&
+        request.resource.data.uid is string &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.term is string &&
+        request.resource.data.meaning is string &&
+        request.resource.data.example is string &&
+        request.resource.data.status == 'pending';
+      allow read: if signedIn();
+      allow update, delete: if false;
+    }
   }
 }

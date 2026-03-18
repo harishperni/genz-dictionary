@@ -1,15 +1,16 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../theme/app_theme.dart';
 import '../../streak/streak_banner.dart';
+import '../../streak/streak_controller_firebase.dart';
 import '../app/slang_providers.dart';
 import '../domain/slang_entry.dart';
-import '../../../theme/app_theme.dart';
-
 import 'xp_progress_bar.dart';
-import '../../streak/streak_controller_firebase.dart';
 
 class SearchPage extends ConsumerStatefulWidget {
   const SearchPage({super.key});
@@ -20,20 +21,63 @@ class SearchPage extends ConsumerStatefulWidget {
 
 class _SearchPageState extends ConsumerState<SearchPage> {
   final TextEditingController _controller = TextEditingController();
+  final Map<String, String> _hayCache = {};
+  final GlobalKey<XPProgressBarState> xpBarKey = GlobalKey<XPProgressBarState>();
 
   String _qRaw = '';
   String _q = '';
   Timer? _debounce;
 
-  final Map<String, String> _hayCache = {};
+  bool _challengeDoneToday = false;
+  bool _loadingChallengeState = true;
 
-  final GlobalKey<XPProgressBarState> xpBarKey = GlobalKey<XPProgressBarState>();
+  @override
+  void initState() {
+    super.initState();
+    _loadChallengeState();
+  }
 
   @override
   void dispose() {
     _debounce?.cancel();
     _controller.dispose();
     super.dispose();
+  }
+
+  String _todayKey() {
+    final now = DateTime.now();
+    final m = now.month.toString().padLeft(2, '0');
+    final d = now.day.toString().padLeft(2, '0');
+    return 'daily_challenge_done_${now.year}_$m$d';
+  }
+
+  Future<void> _loadChallengeState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final done = prefs.getBool(_todayKey()) ?? false;
+    if (!mounted) return;
+    setState(() {
+      _challengeDoneToday = done;
+      _loadingChallengeState = false;
+    });
+  }
+
+  Future<void> _completeChallenge(SlangEntry entry) async {
+    if (_challengeDoneToday) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_todayKey(), true);
+
+    if (!mounted) return;
+    setState(() => _challengeDoneToday = true);
+
+    await ref.read(streakFBProvider.notifier).trackWordViewed(entry.term);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Challenge complete: +XP for ${entry.term}'),
+      ),
+    );
   }
 
   void _onQueryChanged(String v) {
@@ -53,11 +97,24 @@ class _SearchPageState extends ConsumerState<SearchPage> {
 
     return all.where((e) {
       final hay = _hayCache.putIfAbsent(e.term, () {
-        return '${e.term} ${e.meaning} ${e.example} ${e.tags.join(" ")}'
-            .toLowerCase();
+        return '${e.term} ${e.meaning} ${e.example} ${e.tags.join(" ")}'.toLowerCase();
       });
       return hay.contains(query);
     }).toList();
+  }
+
+  List<String> _topTags(List<SlangEntry> all) {
+    final counts = <String, int>{};
+    for (final e in all) {
+      for (final tag in e.tags) {
+        final t = tag.trim().toLowerCase();
+        if (t.isEmpty) continue;
+        counts[t] = (counts[t] ?? 0) + 1;
+      }
+    }
+    final entries = counts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return entries.take(8).map((e) => e.key).toList();
   }
 
   @override
@@ -65,173 +122,200 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     final listAsync = ref.watch(slangListProvider);
     final sodAsync = ref.watch(slangOfDayProvider);
 
-    return Container(
-      decoration: neonGradientBackground(), // keep your existing background helper
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: SafeArea(
-          child: Column(
-            children: [
-              // ✅ Top Header (Replit vibe)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
-                child: Row(
-                  children: [
-                    const _LogoMark(),
-                    const SizedBox(width: 10),
-                    const Text(
-                      'GenZ Dict',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 18,
-                      ),
-                    ),
-                    const Spacer(),
-                    _GlassPill(
-                      onTap: () => context.pushNamed('battle_menu'),
-                      child: Row(
-                        children: [
-                          Icon(Icons.sports_kabaddi_rounded,
-                              color: Colors.white.withOpacity(0.85), size: 18),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Battle',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.85),
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // XP bar
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: XPProgressBar(key: xpBarKey),
-              ),
-
-              // ✅ Quick actions row (glass chips)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-                child: Row(
-                  children: const [
-                    _QuickChip(
-                      icon: Icons.emoji_events_rounded,
-                      label: 'Badges',
-                      routeName: 'badges',
-                      accent: Color(0xFFFF4FD8),
-                    ),
-                    SizedBox(width: 10),
-                    _QuickChip(
-                      icon: Icons.favorite_rounded,
-                      label: 'Favorites',
-                      routeName: 'favorites',
-                      accent: Color(0xFFA855F7),
-                    ),
-                    SizedBox(width: 10),
-                    _QuickChip(
-                      icon: Icons.quiz_rounded,
-                      label: 'Quiz',
-                      routeName: 'quiz',
-                      accent: Color(0xFF22D3EE),
-                    ),
-                  ],
-                ),
-              ),
-
-              const StreakBanner(),
-
-              // Slang of day
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-                child: sodAsync.when(
-                  data: (e) => _SlangOfDayCard(entry: e),
-                  loading: () => _glassShimmer(height: 88),
-                  error: (_, __) => const SizedBox.shrink(),
-                ),
-              ),
-
-              // ✅ Search bar (glass)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
-                child: _GlassSearchBar(
-                  controller: _controller,
-                  onChanged: _onQueryChanged,
-                ),
-              ),
-
-              Expanded(
-                child: listAsync.when(
-                  data: (all) {
-                    final items = _filter(all, _q);
-
-                    if (items.isEmpty) {
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Text(
-                            'No results for "${_q.trim()}"',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.75),
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
+    return Stack(
+      children: [
+        Container(decoration: neonGradientBackground()),
+        Positioned(
+          top: -90,
+          left: -70,
+          child: _orb(const Color(0xFF2DD4BF).withOpacity(0.14), 220),
+        ),
+        Positioned(
+          top: 120,
+          right: -90,
+          child: _orb(const Color(0xFFFF6B9A).withOpacity(0.13), 240),
+        ),
+        Positioned(
+          bottom: -80,
+          left: 60,
+          child: _orb(const Color(0xFF60A5FA).withOpacity(0.11), 220),
+        ),
+        Scaffold(
+          backgroundColor: Colors.transparent,
+          body: SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
+                  child: Row(
+                    children: [
+                      const _LogoMark(),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'GENZ DICTIONARY',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15,
+                          letterSpacing: 1.1,
                         ),
-                      );
-                    }
-
-                    return ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 110),
-                      itemCount: items.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (context, i) => _SlangTile(entry: items[i]),
-                    );
-                  },
-                  loading: () => ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 110),
-                    itemCount: 10,
-                    itemBuilder: (_, __) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _glassShimmer(height: 70),
-                    ),
+                      ),
+                      const Spacer(),
+                      _GlassPill(
+                        onTap: () => context.pushNamed('battle_menu'),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.sports_kabaddi_rounded,
+                                color: Color(0xFF90F3FF), size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              'Battle',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  error: (e, _) => Center(
-                    child: Text(
-                      'Error: $e',
-                      style: const TextStyle(color: Colors.white),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: XPProgressBar(key: xpBarKey),
+                ),
+                Expanded(
+                  child: listAsync.when(
+                    data: (all) {
+                      final items = _filter(all, _q);
+                      final tags = _topTags(all);
+
+                      return ListView(
+                        padding: const EdgeInsets.fromLTRB(14, 4, 14, 120),
+                        children: [
+                          _HeroCard(wordCount: all.length),
+                          const SizedBox(height: 12),
+                          _ActionScroller(
+                            onTapBadges: () => context.pushNamed('badges'),
+                            onTapFavorites: () => context.pushNamed('favorites'),
+                            onTapQuiz: () => context.pushNamed('quiz'),
+                            onTapLeaderboard: () => context.pushNamed('leaderboard'),
+                            onTapSubmitSlang: () => context.pushNamed('submit_slang'),
+                          ),
+                          const SizedBox(height: 12),
+                          const StreakBanner(),
+                          const SizedBox(height: 8),
+                          sodAsync.when(
+                            data: (e) => _SlangOfDayCard(entry: e),
+                            loading: () => _glassShimmer(height: 88),
+                            error: (_, __) => const SizedBox.shrink(),
+                          ),
+                          const SizedBox(height: 10),
+                          if (_loadingChallengeState)
+                            _glassShimmer(height: 108)
+                          else
+                            _DailyChallengeCard(
+                              entry: all.isEmpty
+                                  ? null
+                                  : all[(DateTime.now().year * 10000 +
+                                          DateTime.now().month * 100 +
+                                          DateTime.now().day) %
+                                      all.length],
+                              done: _challengeDoneToday,
+                              onComplete: _completeChallenge,
+                            ),
+                          const SizedBox(height: 10),
+                          _TrendingTags(
+                            tags: tags,
+                            onTapTag: (tag) {
+                              _controller.text = tag;
+                              _onQueryChanged(tag);
+                            },
+                          ),
+                          const SizedBox(height: 10),
+                          _GlassSearchBar(
+                            controller: _controller,
+                            onChanged: _onQueryChanged,
+                          ),
+                          const SizedBox(height: 12),
+                          if (items.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Text(
+                                'No results for "${_q.trim()}"',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.75),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            )
+                          else
+                            ...List.generate(items.length, (i) {
+                              return Padding(
+                                padding: EdgeInsets.only(bottom: i == items.length - 1 ? 0 : 10),
+                                child: _SlangTile(entry: items[i]),
+                              );
+                            }),
+                        ],
+                      );
+                    },
+                    loading: () => ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 110),
+                      itemCount: 10,
+                      itemBuilder: (_, __) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _glassShimmer(height: 70),
+                      ),
+                    ),
+                    error: (e, _) => Center(
+                      child: Text(
+                        'Error: $e',
+                        style: const TextStyle(color: Colors.white),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
+          ),
+          floatingActionButton: FloatingActionButton.extended(
+            backgroundColor: const Color(0xFF0EA5E9),
+            icon: const Icon(Icons.auto_graph_rounded, color: Colors.white),
+            label: const Text('Boost XP'),
+            onPressed: () async {
+              const addedXP = 50;
+              final notifier = ref.read(streakFBProvider.notifier);
+              await notifier.debugAddXP(addedXP);
+              xpBarKey.currentState?.showXPGain(addedXP);
+            },
           ),
         ),
+      ],
+    );
+  }
 
-        // Keep your debug XP button (optional)
-        floatingActionButton: FloatingActionButton.extended(
-          backgroundColor: const Color(0xFF7C3AED),
-          icon: const Icon(Icons.add, color: Colors.white),
-          label: const Text('Add XP'),
-          onPressed: () async {
-            const addedXP = 50;
-            final notifier = ref.read(streakFBProvider.notifier);
-            await notifier.debugAddXP(addedXP);
-            xpBarKey.currentState?.showXPGain(addedXP);
-          },
+  Widget _orb(Color color, double size) {
+    return IgnorePointer(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: color,
+              blurRadius: 90,
+              spreadRadius: 40,
+            ),
+          ],
         ),
       ),
     );
   }
 }
-
-// ---------- UI helpers (local to this file) ----------
 
 class _LogoMark extends StatelessWidget {
   const _LogoMark();
@@ -239,12 +323,12 @@ class _LogoMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 34,
-      height: 34,
+      width: 36,
+      height: 36,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
         gradient: const LinearGradient(
-          colors: [Color(0xFF7C3AED), Color(0xFF22D3EE)],
+          colors: [Color(0xFFF43F5E), Color(0xFF0EA5E9)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -252,7 +336,134 @@ class _LogoMark extends StatelessWidget {
       child: const Center(
         child: Text(
           'Z',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+            fontSize: 18,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroCard extends StatelessWidget {
+  final int wordCount;
+
+  const _HeroCard({required this.wordCount});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0x44FB7185), Color(0x4422D3EE), Color(0x335A67D8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withOpacity(0.18)),
+      ),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Talk less basic. Speak internet.',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 21,
+              height: 1.15,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '$wordCount slang terms, quizzes, battles, streaks, and daily missions.',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.80),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionScroller extends StatelessWidget {
+  final VoidCallback onTapBadges;
+  final VoidCallback onTapFavorites;
+  final VoidCallback onTapQuiz;
+  final VoidCallback onTapLeaderboard;
+  final VoidCallback onTapSubmitSlang;
+
+  const _ActionScroller({
+    required this.onTapBadges,
+    required this.onTapFavorites,
+    required this.onTapQuiz,
+    required this.onTapLeaderboard,
+    required this.onTapSubmitSlang,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _ActionChip(label: 'Badges', icon: Icons.emoji_events_rounded, accent: const Color(0xFFF43F5E), onTap: onTapBadges),
+          const SizedBox(width: 8),
+          _ActionChip(label: 'Favorites', icon: Icons.favorite_rounded, accent: const Color(0xFFFB7185), onTap: onTapFavorites),
+          const SizedBox(width: 8),
+          _ActionChip(label: 'Quiz', icon: Icons.quiz_rounded, accent: const Color(0xFF22D3EE), onTap: onTapQuiz),
+          const SizedBox(width: 8),
+          _ActionChip(label: 'Leaderboard', icon: Icons.leaderboard_rounded, accent: const Color(0xFF38BDF8), onTap: onTapLeaderboard),
+          const SizedBox(width: 8),
+          _ActionChip(label: 'Submit Slang', icon: Icons.edit_note_rounded, accent: const Color(0xFF34D399), onTap: onTapSubmitSlang),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color accent;
+  final VoidCallback onTap;
+
+  const _ActionChip({
+    required this.label,
+    required this.icon,
+    required this.accent,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withOpacity(0.12)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: accent, size: 18),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.94),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -283,53 +494,6 @@ class _GlassPill extends StatelessWidget {
   }
 }
 
-class _QuickChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String routeName;
-  final Color accent;
-
-  const _QuickChip({
-    required this.icon,
-    required this.label,
-    required this.routeName,
-    required this.accent,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: () => context.pushNamed(routeName),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.06),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.white.withOpacity(0.12)),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: accent, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.90),
-                  fontWeight: FontWeight.w900,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _GlassSearchBar extends StatelessWidget {
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
@@ -343,7 +507,7 @@ class _GlassSearchBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.07),
+        color: Colors.white.withOpacity(0.08),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Colors.white.withOpacity(0.12)),
       ),
@@ -367,8 +531,8 @@ class _GlassSearchBar extends StatelessWidget {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(18),
-            borderSide: BorderSide(
-              color: const Color(0xFF7C3AED).withOpacity(0.9),
+            borderSide: const BorderSide(
+              color: Color(0xFF22D3EE),
               width: 1.2,
             ),
           ),
@@ -379,9 +543,9 @@ class _GlassSearchBar extends StatelessWidget {
   }
 }
 
-// --- Slang of the Day card ---
 class _SlangOfDayCard extends StatelessWidget {
   final SlangEntry? entry;
+
   const _SlangOfDayCard({required this.entry});
 
   @override
@@ -424,9 +588,137 @@ class _SlangOfDayCard extends StatelessWidget {
   }
 }
 
-// --- Slang list tile ---
+class _DailyChallengeCard extends StatelessWidget {
+  final SlangEntry? entry;
+  final bool done;
+  final ValueChanged<SlangEntry> onComplete;
+
+  const _DailyChallengeCard({
+    required this.entry,
+    required this.done,
+    required this.onComplete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final e = entry;
+    if (e == null) return const SizedBox.shrink();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0x1A34D399),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withOpacity(0.14)),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.local_fire_department_rounded, color: Color(0xFF34D399)),
+              SizedBox(width: 8),
+              Text(
+                'Daily Challenge',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Use "${e.term}" in a sentence and tap complete to claim XP.',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.88),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.icon(
+              onPressed: done ? null : () => onComplete(e),
+              icon: Icon(done ? Icons.check_rounded : Icons.task_alt_rounded),
+              label: Text(done ? 'Completed Today' : 'Mark Complete'),
+              style: FilledButton.styleFrom(
+                backgroundColor: done ? const Color(0xFF64748B) : const Color(0xFF10B981),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TrendingTags extends StatelessWidget {
+  final List<String> tags;
+  final ValueChanged<String> onTapTag;
+
+  const _TrendingTags({required this.tags, required this.onTapTag});
+
+  @override
+  Widget build(BuildContext context) {
+    if (tags.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withOpacity(0.10)),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Trending right now',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: tags
+                .map(
+                  (t) => InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () => onTapTag(t),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white.withOpacity(0.16)),
+                      ),
+                      child: Text(
+                        '#$t',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SlangTile extends StatelessWidget {
   final SlangEntry entry;
+
   const _SlangTile({required this.entry});
 
   @override

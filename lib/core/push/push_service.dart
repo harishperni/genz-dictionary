@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter_native_timezone/flutter_native_timezone.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
@@ -231,13 +230,35 @@ class PushService {
     final sw = Stopwatch()..start();
     tzdata.initializeTimeZones(); // heavy; do once
     try {
-      final nativeTz = await FlutterNativeTimezone.getLocalTimezone();
-      tz.setLocalLocation(tz.getLocation(nativeTz));
+      final localName = _resolveLocalTimezone();
+      tz.setLocalLocation(tz.getLocation(localName));
     } catch (_) {
       tz.setLocalLocation(tz.getLocation('UTC'));
     }
     _tzReady = true;
     debugPrint('🕒 tz init in ${sw.elapsedMilliseconds} ms');
+  }
+
+  static String _resolveLocalTimezone() {
+    final raw = DateTime.now().timeZoneName.trim();
+    if (raw.contains('/')) return raw;
+
+    const map = <String, String>{
+      'UTC': 'UTC',
+      'GMT': 'UTC',
+      'EST': 'America/New_York',
+      'EDT': 'America/New_York',
+      'CST': 'America/Chicago',
+      'CDT': 'America/Chicago',
+      'MST': 'America/Denver',
+      'MDT': 'America/Denver',
+      'PST': 'America/Los_Angeles',
+      'PDT': 'America/Los_Angeles',
+    };
+
+    final fromMap = map[raw.toUpperCase()];
+    if (fromMap != null) return fromMap;
+    return 'UTC';
   }
 
   static String? _encodeSimplePayload(Map<String, dynamic> data) {
