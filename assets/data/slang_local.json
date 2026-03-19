@@ -1097,6 +1097,230 @@
       "example": "That bow dress is so coquette.",
       "emojis": ["🎀","🌸"],
       "tags": ["aesthetic","fashion"]
+    },
+    {
+      "term": "clocked",
+      "meaning": "Noticed or called out immediately.",
+      "example": "She clocked the fake story instantly.",
+      "emojis": ["🕒","👀"],
+      "tags": ["reaction","social"]
+    },
+    {
+      "term": "aura",
+      "meaning": "Your overall vibe and presence.",
+      "example": "He walked in with villain aura.",
+      "emojis": ["✨","😮"],
+      "tags": ["vibes","social"]
+    },
+    {
+      "term": "aura farming",
+      "meaning": "Doing things mainly to look cool.",
+      "example": "That slow-mo clip is pure aura farming.",
+      "emojis": ["📸","😎"],
+      "tags": ["internet","humor"]
+    },
+    {
+      "term": "corecore",
+      "meaning": "Emotional montage-style internet edit aesthetic.",
+      "example": "That video is peak corecore.",
+      "emojis": ["🎞️","🫀"],
+      "tags": ["internet","aesthetic"]
+    },
+    {
+      "term": "mid",
+      "meaning": "Average; not impressive.",
+      "example": "The sequel was kinda mid.",
+      "emojis": ["😐","🟰"],
+      "tags": ["review","reaction"]
+    },
+    {
+      "term": "left no crumbs",
+      "meaning": "Executed perfectly with no flaws.",
+      "example": "Her speech left no crumbs.",
+      "emojis": ["🍽️","🏆"],
+      "tags": ["compliment","performance"]
+    },
+    {
+      "term": "ratioed",
+      "meaning": "Got more replies than likes, usually negative.",
+      "example": "He got ratioed for that take.",
+      "emojis": ["📉","💬"],
+      "tags": ["internet","social"]
+    },
+    {
+      "term": "chronically online",
+      "meaning": "Spends too much time on internet culture.",
+      "example": "That joke is chronically online.",
+      "emojis": ["📱","🌐"],
+      "tags": ["internet","humor"]
+    },
+    {
+      "term": "touch grass",
+      "meaning": "Go outside and reset from online drama.",
+      "example": "After that thread, I need to touch grass.",
+      "emojis": ["🌱","🚶"],
+      "tags": ["internet","advice"]
+    },
+    {
+      "term": "lore",
+      "meaning": "Backstory or hidden context.",
+      "example": "Drop the lore behind this photo.",
+      "emojis": ["📚","🕵️"],
+      "tags": ["story","internet"]
+    },
+    {
+      "term": "plot twist",
+      "meaning": "Unexpected turn in events.",
+      "example": "Plot twist: she already knew.",
+      "emojis": ["🎬","😵"],
+      "tags": ["reaction","story"]
+    },
+    {
+      "term": "goated",
+      "meaning": "Exceptionally great; top tier.",
+      "example": "That producer is goated.",
+      "emojis": ["🐐","🔥"],
+      "tags": ["compliment","ranking"]
+    },
+    {
+      "term": "cooked",
+      "meaning": "In trouble; out of options.",
+      "example": "Miss one more deadline and we’re cooked.",
+      "emojis": ["🍳","😬"],
+      "tags": ["stress","school"]
+    },
+    {
+      "term": "locked in",
+      "meaning": "Fully focused and committed.",
+      "example": "Exam week, I’m locked in.",
+      "emojis": ["🔒","📖"],
+      "tags": ["focus","school"]
+    },
+    {
+      "term": "on demon time",
+      "meaning": "Acting wild or intensely bold.",
+      "example": "He was on demon time in ranked.",
+      "emojis": ["😈","⚡"],
+      "tags": ["gaming","energy"]
+    },
+    {
+      "term": "delivered",
+      "meaning": "Met or exceeded expectations.",
+      "example": "That season finale delivered.",
+      "emojis": ["✅","🎉"],
+      "tags": ["review","compliment"]
+    },
+    {
+      "term": "hard launch",
+      "meaning": "Publicly revealing relationship/thing clearly.",
+      "example": "She hard launched her boyfriend on IG.",
+      "emojis": ["📣","❤️"],
+      "tags": ["dating","social"]
+    },
+    {
+      "term": "soft launch",
+      "meaning": "Hinting at something without full reveal.",
+      "example": "That hand pic is a soft launch.",
+      "emojis": ["🤳","🫣"],
+      "tags": ["dating","social"]
+    },
+    {
+      "term": "healing era",
+      "meaning": "Period of personal growth and recovery.",
+      "example": "I’m in my healing era this semester.",
+      "emojis": ["🌿","🫶"],
+      "tags": ["wellness","lifestyle"]
+    },
+    {
+      "term": "villain era",
+      "meaning": "Prioritizing self over pleasing others.",
+      "example": "No more overthinking, villain era.",
+      "emojis": ["🖤","👑"],
+      "tags": ["mindset","lifestyle"]
+    },
+    {
+      "term": "for the plot",
+      "meaning": "Doing something for experience/story value.",
+      "example": "Booked the trip for the plot.",
+      "emojis": ["🎭","✈️"],
+      "tags": ["adventure","humor"]
+    },
+    {
+      "term": "green flag",
+      "meaning": "Positive sign in behavior.",
+      "example": "He listens well—green flag.",
+      "emojis": ["🟢","✅"],
+      "tags": ["dating","social"]
+    },
+    {
+      "term": "red flag",
+      "meaning": "Warning sign in behavior.",
+      "example": "Never apologizes? Red flag.",
+      "emojis": ["🚩","⚠️"],
+      "tags": ["dating","social"]
+    },
+    {
+      "term": "ick",
+      "meaning": "Sudden feeling of disgust/turnoff.",
+      "example": "That voice note gave me the ick.",
+      "emojis": ["🤢","🙅"],
+      "tags": ["dating","reaction"]
+    },
+    {
+      "term": "canon event",
+      "meaning": "Important experience that shapes you.",
+      "example": "That rejection was a canon event.",
+      "emojis": ["🕷️","📖"],
+      "tags": ["growth","internet"]
+    },
+    {
+      "term": "npc stream",
+      "meaning": "Repetitive live stream style with loops.",
+      "example": "He does NPC stream bits every night.",
+      "emojis": ["🤖","🔁"],
+      "tags": ["internet","gaming"]
+    },
+    {
+      "term": "brain chemistry changed",
+      "meaning": "Something affected you deeply.",
+      "example": "That album changed my brain chemistry.",
+      "emojis": ["🧠","🎧"],
+      "tags": ["music","reaction"]
+    },
+    {
+      "term": "it’s not that deep",
+      "meaning": "You’re overanalyzing.",
+      "example": "Relax, it’s not that deep.",
+      "emojis": ["🫠","🧊"],
+      "tags": ["advice","reaction"]
+    },
+    {
+      "term": "main slayer",
+      "meaning": "Person who consistently serves looks/results.",
+      "example": "She’s the main slayer in our group.",
+      "emojis": ["💅","🌟"],
+      "tags": ["compliment","fashion"]
+    },
+    {
+      "term": "caught in 4k",
+      "meaning": "Clearly exposed with proof.",
+      "example": "He denied it then got caught in 4K.",
+      "emojis": ["📷","😬"],
+      "tags": ["internet","reaction"]
+    },
+    {
+      "term": "rent free",
+      "meaning": "Stuck in your mind constantly.",
+      "example": "That phrase lives rent free in my head.",
+      "emojis": ["🧠","🏠"],
+      "tags": ["mind","internet"]
+    },
+    {
+      "term": "down bad",
+      "meaning": "Desperate, usually romantically.",
+      "example": "Posting sad quotes all night? Down bad.",
+      "emojis": ["🥀","😭"],
+      "tags": ["dating","emotion"]
     }
 ]
   

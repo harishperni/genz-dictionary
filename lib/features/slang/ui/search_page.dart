@@ -21,7 +21,6 @@ class SearchPage extends ConsumerStatefulWidget {
 
 class _SearchPageState extends ConsumerState<SearchPage> {
   final TextEditingController _controller = TextEditingController();
-  final TextEditingController _challengeController = TextEditingController();
   final Map<String, String> _hayCache = {};
   final GlobalKey<XPProgressBarState> xpBarKey = GlobalKey<XPProgressBarState>();
 
@@ -42,7 +41,6 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   void dispose() {
     _debounce?.cancel();
     _controller.dispose();
-    _challengeController.dispose();
     super.dispose();
   }
 
@@ -63,22 +61,11 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     });
   }
 
-  Future<void> _completeChallenge(SlangEntry entry, String sentence) async {
+  Future<void> _completeChallenge(SlangEntry entry) async {
     if (_challengeDoneToday) return;
-    final s = sentence.trim();
-    if (s.length < 8 || !s.toLowerCase().contains(entry.term.toLowerCase())) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Write a sentence using "${entry.term}" first.'),
-        ),
-      );
-      return;
-    }
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_todayKey(), true);
-    await prefs.setString('${_todayKey()}_text', s);
 
     if (!mounted) return;
     setState(() => _challengeDoneToday = true);
@@ -238,11 +225,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                                           DateTime.now().day) %
                                       all.length],
                               done: _challengeDoneToday,
-                              inputController: _challengeController,
-                              onComplete: (entry) => _completeChallenge(
-                                entry,
-                                _challengeController.text,
-                              ),
+                              onComplete: _completeChallenge,
                             ),
                           const SizedBox(height: 10),
                           _TrendingTags(
@@ -614,13 +597,11 @@ class _SlangOfDayCard extends StatelessWidget {
 class _DailyChallengeCard extends StatelessWidget {
   final SlangEntry? entry;
   final bool done;
-  final TextEditingController inputController;
   final ValueChanged<SlangEntry> onComplete;
 
   const _DailyChallengeCard({
     required this.entry,
     required this.done,
-    required this.inputController,
     required this.onComplete,
   });
 
@@ -655,21 +636,10 @@ class _DailyChallengeCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Use "${e.term}" in a sentence and tap complete to claim XP.',
+            'Tap complete after you use "${e.term}" in a sentence to claim XP.',
             style: TextStyle(
               color: Colors.white.withOpacity(0.88),
               fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: inputController,
-            minLines: 1,
-            maxLines: 3,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-            decoration: InputDecoration(
-              hintText: 'Type your sentence...',
-              hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
             ),
           ),
           const SizedBox(height: 10),
