@@ -63,3 +63,10 @@ web/.firebase/
 
 # Others
 pubspec.lock
+# Functions local deps
+functions/node_modules/
+functions/.env
+
+# Functions local deps
+functions/node_modules/
+functions/.env
