@@ -1321,6 +1321,181 @@
       "example": "Posting sad quotes all night? Down bad.",
       "emojis": ["🥀","😭"],
       "tags": ["dating","emotion"]
+    },
+    {
+      "term": "aura points",
+      "meaning": "Social credit for doing something impressive or cool.",
+      "example": "Helping everyone prep gave you major aura points.",
+      "emojis": ["✨","📈"],
+      "tags": ["social","compliment"]
+    },
+    {
+      "term": "standing on business",
+      "meaning": "Following through seriously and confidently.",
+      "example": "She is standing on business with that launch.",
+      "emojis": ["💼","🧠"],
+      "tags": ["mindset","confidence"]
+    },
+    {
+      "term": "glazing",
+      "meaning": "Overpraising someone to an excessive level.",
+      "example": "You are glazing that brand way too hard.",
+      "emojis": ["🍩","🗣️"],
+      "tags": ["internet","reaction"]
+    },
+    {
+      "term": "no crumbs",
+      "meaning": "So good there was nothing lacking.",
+      "example": "That performance left no crumbs.",
+      "emojis": ["🍽️","🔥"],
+      "tags": ["compliment","performance"]
+    },
+    {
+      "term": "let him cook",
+      "meaning": "Let someone continue because they are doing well.",
+      "example": "Do not interrupt, let him cook.",
+      "emojis": ["👨‍🍳","✅"],
+      "tags": ["encouragement","chat"]
+    },
+    {
+      "term": "crash out",
+      "meaning": "Overreact emotionally in public or online.",
+      "example": "He might crash out if this keeps trending.",
+      "emojis": ["💥","😵"],
+      "tags": ["reaction","internet"]
+    },
+    {
+      "term": "debrief",
+      "meaning": "Talk through what happened after an event.",
+      "example": "Call me after the date, we need a debrief.",
+      "emojis": ["📞","📝"],
+      "tags": ["social","chat"]
+    },
+    {
+      "term": "read",
+      "meaning": "A sharp verbal takedown or critique.",
+      "example": "She read him in one sentence.",
+      "emojis": ["📚","🎯"],
+      "tags": ["humor","internet"]
+    },
+    {
+      "term": "it girl",
+      "meaning": "A person seen as stylish and culturally on-point.",
+      "example": "She is the it girl of this semester.",
+      "emojis": ["💅","🌟"],
+      "tags": ["fashion","social"]
+    },
+    {
+      "term": "it boy",
+      "meaning": "A person seen as stylish and influential right now.",
+      "example": "He became the it boy after that campaign.",
+      "emojis": ["🕶️","⭐"],
+      "tags": ["fashion","social"]
+    },
+    {
+      "term": "mother",
+      "meaning": "A title for someone iconic, confident, and admired.",
+      "example": "That artist is mother, no debate.",
+      "emojis": ["👑","💃"],
+      "tags": ["stan","compliment"]
+    },
+    {
+      "term": "ate and left no crumbs",
+      "meaning": "Did exceptionally well with nothing to criticize.",
+      "example": "You ate and left no crumbs on that pitch.",
+      "emojis": ["🍽️","🏆"],
+      "tags": ["compliment","performance"]
+    },
+    {
+      "term": "healed girl era",
+      "meaning": "A phase focused on emotional growth and peace.",
+      "example": "I am in my healed girl era this year.",
+      "emojis": ["🫶","🌿"],
+      "tags": ["wellness","mindset"]
+    },
+    {
+      "term": "core memory",
+      "meaning": "A moment that feels unforgettable.",
+      "example": "That concert was a core memory.",
+      "emojis": ["🧠","📸"],
+      "tags": ["emotion","lifestyle"]
+    },
+    {
+      "term": "main feed",
+      "meaning": "Your public primary social profile timeline.",
+      "example": "This photo is main feed worthy.",
+      "emojis": ["📱","🖼️"],
+      "tags": ["social","internet"]
+    },
+    {
+      "term": "lore drop",
+      "meaning": "New background info about a person or situation.",
+      "example": "Wait, that was a huge lore drop.",
+      "emojis": ["📜","👀"],
+      "tags": ["internet","chat"]
+    },
+    {
+      "term": "girl dinner",
+      "meaning": "A random low-effort meal put together casually.",
+      "example": "Crackers and fruit is tonight’s girl dinner.",
+      "emojis": ["🧀","🍇"],
+      "tags": ["food","humor"]
+    },
+    {
+      "term": "boy math",
+      "meaning": "Joke format pointing out inconsistent logic by guys.",
+      "example": "That excuse is pure boy math.",
+      "emojis": ["🧮","🤷"],
+      "tags": ["humor","internet"]
+    },
+    {
+      "term": "girl math",
+      "meaning": "Joke format rationalizing purchases or decisions.",
+      "example": "It was on sale, girl math says free.",
+      "emojis": ["🧮","🛍️"],
+      "tags": ["humor","shopping"]
+    },
+    {
+      "term": "rizzler",
+      "meaning": "Someone with standout flirting charisma.",
+      "example": "He is the rizzler of the group chat.",
+      "emojis": ["😏","💬"],
+      "tags": ["dating","social"]
+    },
+    {
+      "term": "sigma",
+      "meaning": "Internet archetype for highly independent confidence.",
+      "example": "That solo grindset edit is very sigma.",
+      "emojis": ["🧊","🦾"],
+      "tags": ["internet","mindset"]
+    },
+    {
+      "term": "oh that’s not",
+      "meaning": "Expression used when something is awkward or off.",
+      "example": "He replied all to that email, oh that’s not.",
+      "emojis": ["😬","🚫"],
+      "tags": ["reaction","chat"]
+    },
+    {
+      "term": "coded",
+      "meaning": "Having the vibe or signals of a specific style.",
+      "example": "That outfit is very coastal coded.",
+      "emojis": ["🧩","✨"],
+      "tags": ["aesthetic","fashion"]
+    },
+    {
+      "term": "clock it",
+      "meaning": "To notice and call out something quickly.",
+      "example": "She clocked the typo in two seconds.",
+      "emojis": ["⏱️","👁️"],
+      "tags": ["reaction","internet"]
+    },
+    {
+      "term": "spill",
+      "meaning": "Share the details or tea.",
+      "example": "Spill, what happened after the party?",
+      "emojis": ["🫖","🗣️"],
+      "tags": ["chat","social"]
     }
 ]
   
